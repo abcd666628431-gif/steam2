@@ -169,13 +169,14 @@
         };
 
         const firebaseConfig = {
-            apiKey: "AIzaSyDNYdJPpz9_7nC8eqdKxzQw3r_HSuc95ck",
-            authDomain: "steam2-43c65.firebaseapp.com",
-            projectId: "steam2-43c65",
-            storageBucket: "steam2-43c65.firebasestorage.app",
-            messagingSenderId: "724393722543",
-            appId: "1:724393722543:web:2824b735551700f080ca5a"
-        };
+  apiKey: "AIzaSyBjQ9yIa7TyaYDRGsT_HPCpPHsgStiJE94",
+  authDomain: "cloud-714ce.firebaseapp.com",
+  projectId: "cloud-714ce",
+  storageBucket: "cloud-714ce.firebasestorage.app",
+  messagingSenderId: "793151737559",
+  appId: "1:793151737559:web:7e7def7c8012bc91542a92",
+  measurementId: "G-9QC9JZ6SB9"
+};
 
         if (isClient && !firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = isClient ? firebase.firestore() : null;
