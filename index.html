@@ -395,9 +395,13 @@
                     const statusSnap = await db.collection(paths.statuses).get();
                     const statusList = []; statusSnap.forEach(doc => statusList.push({ id: doc.id, ...doc.data() }));
                     setAllUserStatuses(statusList);
-                    const logSnap = await db.collection(paths.logs).orderBy('timestamp', 'desc').limit(30).get();
+                    
+                    // 修改：先抓取再前端排序，避免索引問題
+                    const logSnap = await db.collection(paths.logs).limit(30).get();
                     const logList = []; logSnap.forEach(doc => logList.push({ id: doc.id, ...doc.data() }));
+                    logList.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
                     setActivityLogs(logList);
+                    
                     const labelDoc = await db.collection(paths.settings).doc('labels').get();
                     if (labelDoc.exists) setStatusLabels(labelDoc.data().list);
                     const rateDoc = await db.collection(paths.settings).doc('rates_v2').get();
@@ -416,7 +420,7 @@
             const handleStatusUpdate = useCallback(async (gameId, targetUserId, updates) => {
                 if (!db || !user) return;
                 let finalUpdates = { ...updates };
-                const currentStatus = allUserStatuses.find(s => (s.gameId === gameId && s.userId === targetUserId) || s.id === `${gameId}_${targetUserId}`);
+                const currentStatus = allUserStatuses.find(s => (s.gameId === gameId && s.userId === targetUserId));
                 if (updates.purchasePrice2 !== undefined || updates.purchaseCurrency2 !== undefined) {
                     const price2 = updates.purchasePrice2 !== undefined ? parseFloat(updates.purchasePrice2) : parseFloat(currentStatus?.purchasePrice2 || 0);
                     const curr2 = updates.purchaseCurrency2 || (currentStatus?.purchaseCurrency2 || rates[0]?.code);
@@ -542,7 +546,6 @@
                 } catch (e) { showNotify("操作失敗"); }
             };
 
-            // 修復拖動邏輯：改用 targetId 定位索引
             const handleStartDrag = (id, pId) => { 
                 setDraggedId(id); 
                 setDraggedParentId(pId || ""); 
@@ -551,12 +554,9 @@
             const handleDrop = async (targetId, targetParentId) => {
                 const tPId = targetParentId || "";
                 const dPId = draggedParentId || "";
-                
-                // 限制：只能在同一個父分組下（或同為根目錄）進行排序交換
                 if (!db || !draggedId || dPId !== tPId) return;
                 
                 const batch = db.batch();
-                // 獲取該層級的所有同伴，並按照當前 order 排序
                 const siblings = games
                     .filter(g => (g.parentId || "") === tPId)
                     .sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -567,11 +567,9 @@
                 
                 if (draggedItemIdx === -1 || targetItemIdx === -1 || draggedItemIdx === targetItemIdx) return;
                 
-                // 執行陣列交換
                 const [removed] = newOrderList.splice(draggedItemIdx, 1);
                 newOrderList.splice(targetItemIdx, 0, removed);
                 
-                // 重新分配編號
                 newOrderList.forEach((item, idx) => { 
                     batch.update(db.collection(paths.games).doc(item.id), { order: idx + 1 }); 
                 });
@@ -581,18 +579,25 @@
                     setDraggedId(null);
                     setDraggedParentId("");
                     syncData(true);
-                } catch (e) {
-                    showNotify("排序失敗");
-                }
+                } catch (e) { showNotify("排序失敗"); }
             };
 
             const currencies = useMemo(() => ['HK$', ...rates.map(r => r.code)], [rates]);
             const statusOptions = useMemo(() => statusLabels.map(l => ({ id: l.id, label: l.label })), [statusLabels]);
             
+            // 修改：確保成員名單僅包含「現有遊戲」中的人員，排除孤兒數據
             const tableMemberNames = useMemo(() => {
                 const names = new Set();
-                allUserStatuses.forEach(s => { if(s.userName) names.add(s.userName); });
+                const activeGameIds = new Set(games.map(g => g.id));
+                
+                // 僅計算目前存在的遊戲的人員
+                allUserStatuses.forEach(s => { 
+                    if(s.userName && activeGameIds.has(s.gameId)) names.add(s.userName); 
+                });
+                
+                // 也包含錄入現有遊戲的人
                 games.forEach(g => { if(g.addedBy) names.add(g.addedBy); });
+                
                 return Array.from(names).filter(Boolean).sort();
             }, [allUserStatuses, games]);
 
@@ -610,19 +615,31 @@
                 return map;
             }, [allUserStatuses]);
 
+            // 修改：統計數據嚴格過濾掉不屬於 activeGameIds 的項目
             const allMembersStats = useMemo(() => {
                 const activeGameIds = new Set(games.map(g => g.id));
                 return tableMemberNames.map(name => {
                     const userStatuses = allUserStatuses.filter(s => s.userName === name && activeGameIds.has(s.gameId));
-                    const stats = {}; statusLabels.forEach(l => { stats[l.id] = userStatuses.filter(s => s.status === l.id).length; });
+                    const stats = {}; 
+                    statusLabels.forEach(l => { 
+                        stats[l.id] = userStatuses.filter(s => s.status === l.id).length; 
+                    });
                     return { name, color: nameColorMap[name] || '#ffffff', stats };
                 });
             }, [tableMemberNames, allUserStatuses, nameColorMap, statusLabels, games]);
 
             const hierarchy = useMemo(() => {
                 let list = [...games];
-                if (activeFilter) { const matchedIds = allUserStatuses.filter(s => s.userName === activeFilter.userName && s.status === activeFilter.statusId).map(s => s.gameId); list = list.filter(g => matchedIds.includes(g.id)); }
-                if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); list = list.filter(g => (g.name || "").toLowerCase().includes(q)); }
+                if (activeFilter) { 
+                    const matchedIds = allUserStatuses
+                        .filter(s => s.userName === activeFilter.userName && s.status === activeFilter.statusId)
+                        .map(s => s.gameId); 
+                    list = list.filter(g => matchedIds.includes(g.id)); 
+                }
+                if (searchQuery.trim()) { 
+                    const q = searchQuery.toLowerCase(); 
+                    list = list.filter(g => (g.name || "").toLowerCase().includes(q)); 
+                }
                 
                 list.sort((a, b) => {
                     let valA = a[sortConfig.key]; let valB = b[sortConfig.key];
@@ -652,7 +669,7 @@
             useEffect(() => {
                 if (user) {
                     syncData();
-                    // 補回 1 小時定時器
+                    // 補回 1 小時定時器，用於非活動狀態更新
                     const interval = setInterval(() => syncData(true), 3600000);
                     const unsubP = db.collection(paths.presence).onSnapshot(snap => {
                         const list = []; const now = Date.now();
