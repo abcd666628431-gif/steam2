@@ -119,7 +119,7 @@
         const isClient = typeof window !== 'undefined';
         const APP_ID = 'steam-stats-v4';
 
-        // Firebase 設定
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDNYdJPpz9_7nC8eqdKxzQw3r_HSuc95ck",
             authDomain: "steam2-43c65.firebaseapp.com",
@@ -235,7 +235,9 @@
             onUpdateOrder, onAddDLC, onNest, onUnnest, onAddPersonnel, onStatusUpdate, onDelete, onRemovePersonnel,
             onOpenAchievementEdit
         }) => {
+            const [isNoteExpanded, setIsNoteExpanded] = useState(false);
             const addedByColor = nameColorMap[g.addedBy] || '#818cf8';
+
             return (
                 <tr 
                     onDragOver={(e)=>e.preventDefault()} 
@@ -257,9 +259,23 @@
                     <td className="px-6 py-8 text-center selectable-cell">
                         <div className="flex flex-col items-center gap-1">
                             <div className="flex items-center gap-2">
+                                {g.note && (
+                                    <Icon 
+                                        name={isNoteExpanded ? "chevron-up" : "chevron-down"} 
+                                        className="w-4 h-4 text-slate-500 hover:text-white"
+                                        onClick={() => setIsNoteExpanded(!isNoteExpanded)}
+                                    />
+                                )}
                                 <span className={`font-black ${isChild ? 'text-lg text-slate-400' : 'text-xl'}`}>{g.name}</span>
                                 {g.url && <a href={g.url} target="_blank" onClick={(e)=>e.stopPropagation()} className="text-slate-600 hover:text-white"><Icon name="link-2" className="w-4 h-4" /></a>}
                             </div>
+                            
+                            {isNoteExpanded && g.note && (
+                                <div className="text-sm text-white/40 mt-1 max-w-[300px] break-words font-mono transition-all duration-300">
+                                    {g.note}
+                                </div>
+                            )}
+
                             {!isEditLocked && (
                                 <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     {!isChild && <button onClick={(e)=>{e.stopPropagation(); onAddDLC(g.id);}} className="text-[10px] bg-indigo-900/50 px-2 py-1 rounded text-indigo-300 border border-indigo-500/20 font-bold hover:bg-indigo-600 hover:text-white transition-all">+ DLC / 擴充</button>}
@@ -344,7 +360,7 @@
             const [allUserStatuses, setAllUserStatuses] = useState([]); 
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [editingId, setEditingId] = useState(null); 
-            const [formData, setFormData] = useState({ name: '', addedBy: '', price: '0', currency: 'HK$', url: '', cover: null, parentId: '' });
+            const [formData, setFormData] = useState({ name: '', addedBy: '', price: '0', currency: 'HK$', url: '', cover: null, parentId: '', note: '' });
             const [searchQuery, setSearchQuery] = useState(''); 
             const [isEditLocked, setIsEditLocked] = useState(true);
             const [expandedGroups, setExpandedGroups] = useState(new Set());
@@ -374,8 +390,8 @@
 
             const handleToggleGroup = useCallback((id) => setExpandedGroups(p => { const n = new Set(p); if(n.has(id)) n.delete(id); else n.add(id); return n; }), []);
             const handleSetFilter = useCallback((name, sid) => setActiveFilter(prev => { if (prev?.userName === name && prev?.statusId === sid) return null; return { userName: name, statusId: sid }; }), []);
-            const closeModal = useCallback(() => { setFormData({ name: '', addedBy: '', price: '0', currency: 'HK$', url: '', cover: null, parentId: '' }); setEditingId(null); setIsModalOpen(false); }, []);
-            const openEditModal = useCallback((g) => { setEditingId(g.id); setFormData({ name: g.name||'', addedBy: g.addedBy||'', price: g.price||'0', currency: g.currency||'HK$', url: g.url||'', cover: g.cover||null, parentId: g.parentId||'' }); setIsModalOpen(true); }, []);
+            const closeModal = useCallback(() => { setFormData({ name: '', addedBy: '', price: '0', currency: 'HK$', url: '', cover: null, parentId: '', note: '' }); setEditingId(null); setIsModalOpen(false); }, []);
+            const openEditModal = useCallback((g) => { setEditingId(g.id); setFormData({ name: g.name||'', addedBy: g.addedBy||'', price: g.price||'0', currency: g.currency||'HK$', url: g.url||'', cover: g.cover||null, parentId: g.parentId||'', note: g.note || '' }); setIsModalOpen(true); }, []);
 
             const paths = useMemo(() => ({
                 presence: `artifacts/${APP_ID}/public/data/presence`,
@@ -739,7 +755,7 @@
             useEffect(() => { if (isClient && window.lucide) window.lucide.createIcons(); }, [games, isModalOpen, expandedGroups, isEditLocked, allMembersStats, achievementEdit, isRateSettingsOpen, onlineUsers, hierarchy, deleteGameTarget, deletePersonTarget, isSyncing, showNormalizeConfirm, showClearConfirm]);
 
             const handleAddNewGame = useCallback(() => {
-                setFormData({ name: '', addedBy: '', price: '0', currency: 'HK$', url: '', cover: null, parentId: '' });
+                setFormData({ name: '', addedBy: '', price: '0', currency: 'HK$', url: '', cover: null, parentId: '', note: '' });
                 setEditingId(null);
                 setIsModalOpen(true);
             }, []);
@@ -1014,6 +1030,7 @@
                                                     </select>
                                                 </div>
                                                 <div className="modal-field-container items-start"><label className="text-[12px] font-black text-indigo-400 mt-2.5 uppercase tracking-widest">遊戲名稱</label><textarea required rows="2" placeholder="輸入名稱..." className="modal-input-base w-full text-lg font-black resize-none leading-snug" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} /></div>
+                                                <div className="modal-field-container items-start"><label className="text-[12px] font-black text-indigo-400 mt-2.5 uppercase tracking-widest">備註設定</label><textarea rows="2" placeholder="輸入備註（灰色顯示）..." className="modal-input-base w-full text-sm font-bold resize-none leading-snug text-slate-400" value={formData.note} onChange={e=>setFormData({...formData, note: e.target.value})} /></div>
                                                 <div className="modal-field-container"><label className="text-[12px] font-black text-indigo-400 uppercase tracking-widest">商店網址</label><input className="modal-input-base w-full text-[10px] font-mono text-cyan-400" placeholder="https://store.steampowered.com/..." value={formData.url} onChange={e=>setFormData({...formData, url: e.target.value})} /></div>
                                                 <div className="modal-field-container"><label className="text-[12px] font-black text-indigo-400 uppercase tracking-widest">價格設定</label><div className="flex w-fit items-stretch rounded bg-black/40 border-b-2 border-slate-800"><select className="bg-transparent font-black text-indigo-400 outline-none p-2 text-sm appearance-none" value={formData.currency} onChange={e=>setFormData({...formData, currency: e.target.value})}>{currencies.map(c => <option key={c} value={c} className="bg-[#0b0e14]">{c}</option>)}</select><input type="number" placeholder="0" className="bg-transparent p-2 text-xl font-black outline-none text-white w-28" value={formData.price === '0' || formData.price === 0 ? '' : formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} /></div></div>
                                             </div>
