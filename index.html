@@ -164,7 +164,6 @@
             <button id="btn-tab-single" onclick="switchTab('single')" class="flex-1 min-w-max text-[11px] py-1.5 px-2 rounded-md text-slate-500 hover:text-slate-300 transition-all">單筆計算</button>
             <button id="btn-tab-alert" onclick="switchTab('alert')" class="flex-1 min-w-max text-[11px] py-1.5 px-2 rounded-md text-slate-500 hover:text-slate-300 transition-all flex items-center justify-center gap-1">
               <span>🔔 提醒</span>
-              <span id="activeAlertCount" class="hidden bg-rose-500 text-white text-[9px] px-1 rounded-full">0</span>
             </button>
           </div>
 
@@ -214,17 +213,24 @@
               </div>
             </div>
             <form id="alertForm" class="flex gap-2">
-              <select id="alertCondition" class="w-1/3 bg-[#2a2a2a] text-white text-xs rounded-lg px-2 border border-[#444] outline-none focus:border-[#2979ff]">
+              <select id="alertCondition" class="w-1/4 bg-[#2a2a2a] text-white text-xs rounded-lg px-1 border border-[#444] outline-none focus:border-[#2979ff]">
                 <option value=">">≥ 大於</option>
                 <option value="<">≤ 小於</option>
               </select>
-              <input id="alertPrice" type="number" step="any" placeholder="觸發價位" class="w-full px-3 py-1.5 text-xs rounded-lg border border-[#444] bg-[#2a2a2a] text-white focus:border-[#2979ff] outline-none" required>
+              <input id="alertPrice" type="number" step="any" placeholder="觸發價位" class="w-2/4 px-3 py-1.5 text-xs rounded-lg border border-[#444] bg-[#2a2a2a] text-white focus:border-[#2979ff] outline-none" required>
+              <select id="alertType" class="w-1/4 bg-[#2a2a2a] text-white text-[10px] rounded-lg px-1 border border-[#444] outline-none focus:border-[#2979ff]">
+                <option value="multi" selected>持續</option>
+                <option value="once">單次</option>
+              </select>
               <button type="submit" class="bg-[#2979ff] hover:bg-[#1c54b2] text-white px-3 rounded-lg text-lg font-bold transition-colors">+</button>
             </form>
-            <div id="alertList" class="mt-2 space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
+            <div class="flex justify-between items-center mt-4 border-b border-[#333] pb-1">
+              <span class="text-xs text-slate-400">提醒列表 (<span id="alertCountDisplay">0</span>)</span>
+            </div>
+            <div id="alertList" class="mt-1 space-y-1 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
               <!-- Alerts 列表 -->
             </div>
-            <div class="text-[9px] text-slate-500 mt-2 text-center">💡 背景刷新期間會自動監控當前標的</div>
+            <div class="text-[9px] text-slate-500 mt-2 text-center">💡 背景刷新自動監控，可手動開關提醒</div>
           </div>
         </div>
       </div>
@@ -384,8 +390,9 @@
       alertForm: document.getElementById('alertForm'),
       alertCondition: document.getElementById('alertCondition'),
       alertPrice: document.getElementById('alertPrice'),
+      alertType: document.getElementById('alertType'),
       alertList: document.getElementById('alertList'),
-      activeAlertCount: document.getElementById('activeAlertCount'),
+      alertCountDisplay: document.getElementById('alertCountDisplay'),
       alertVolume: document.getElementById('alertVolume'),
       soundUploadInput: document.getElementById('soundUploadInput'),
       soundStatusText: document.getElementById('soundStatusText'),
@@ -611,25 +618,61 @@
     // --- 價位提醒邏輯 ---
     function renderAlerts() {
       const currentSym = els.tickerInput.value.toUpperCase().trim();
-      const activeCount = priceAlerts.length;
       
-      els.activeAlertCount.textContent = activeCount;
-      els.activeAlertCount.className = activeCount > 0 ? 'bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1 font-bold' : 'hidden';
+      if(els.alertCountDisplay) {
+        els.alertCountDisplay.textContent = priceAlerts.length;
+      }
 
-      if (activeCount === 0) {
+      if (priceAlerts.length === 0) {
         els.alertList.innerHTML = '<div class="text-center text-xs text-slate-500 py-3">尚無設定任何提醒</div>';
         return;
       }
       
-      els.alertList.innerHTML = priceAlerts.map(a => `
-        <div class="flex justify-between items-center p-2 rounded-lg bg-[#2a2a2a] border border-[#444] transition-opacity ${a.ticker !== currentSym ? 'opacity-40' : ''}">
-          <span class="text-[11px] font-bold text-slate-300 flex items-center">
-            ${svgIconBell} <span class="text-[#2979ff] ml-1 mr-1.5">${a.ticker}</span> ${a.condition === '>' ? '≥' : '≤'} ${a.price}
-          </span>
-          <button onclick="deleteAlert('${a.id}')" class="text-slate-500 hover:text-rose-500 transition-colors p-1">${svgIconTrash}</button>
+      els.alertList.innerHTML = priceAlerts.map(a => {
+        // 確保向後相容舊資料
+        if (a.isActive === undefined) a.isActive = true;
+        
+        const isUp = a.condition === '>';
+        const iconSvg = isUp 
+          ? '<svg class="text-[#00e676]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
+          : '<svg class="text-[#ff5252]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
+        
+        const titleText = `價格${isUp ? '漲到' : '跌到'} ${a.price}`;
+        const typeText = a.type === 'multi' ? '持續提醒' : '單次提醒';
+        
+        return `
+        <div class="flex justify-between items-center py-2.5 px-2 border-b border-[#333] group relative transition-opacity ${a.ticker !== currentSym ? 'opacity-40 hover:opacity-100' : ''}">
+          <div class="flex items-start space-x-3">
+            <div class="mt-0.5">${iconSvg}</div>
+            <div class="flex flex-col">
+              <div class="flex items-center space-x-3 mb-1">
+                <span class="text-[13px] font-bold ${a.isActive ? 'text-slate-200' : 'text-slate-500'}">${titleText}</span>
+                <span class="text-[11px] ${a.isActive ? 'text-slate-400' : 'text-slate-600'} border-l border-[#444] pl-3">${typeText}</span>
+              </div>
+              <div class="text-[11px] text-slate-500">未備註 ${a.ticker !== currentSym ? `<span class="ml-1 text-[#2979ff]">(${a.ticker})</span>` : ''}</div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button onclick="deleteAlert('${a.id}')" class="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="刪除">
+              ${svgIconTrash}
+            </button>
+            <label class="cursor-pointer relative inline-block w-10 h-5 rounded-full">
+              <input type="checkbox" class="sr-only peer" ${a.isActive ? 'checked' : ''} onchange="toggleAlert('${a.id}', this.checked)">
+              <div class="w-10 h-5 bg-[#444] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[20px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#ff6b00]"></div>
+            </label>
+          </div>
         </div>
-      `).join('');
+      `}).join('');
     }
+
+    window.toggleAlert = function(id, isChecked) {
+      const alert = priceAlerts.find(a => a.id === id);
+      if (alert) {
+        alert.isActive = isChecked;
+        localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
+        renderAlerts();
+      }
+    };
 
     els.alertForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -638,13 +681,14 @@
       
       const p = parseFloat(els.alertPrice.value);
       const c = els.alertCondition.value;
+      const t = els.alertType ? els.alertType.value : 'once'; // 防錯處理
       
-      priceAlerts.push({ id: Date.now().toString(), ticker: sym, condition: c, price: p });
+      priceAlerts.unshift({ id: Date.now().toString(), ticker: sym, condition: c, price: p, type: t, isActive: true });
       localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
       
       els.alertPrice.value = '';
       renderAlerts();
-      showToast(`✅ 已新增提醒：當 ${sym} ${c === '>' ? '≥' : '≤'} ${p} 時通知`, 'success');
+      showToast(`✅ 已新增提醒：當 ${sym} ${c === '>' ? '漲到' : '跌到'} ${p} 時通知`, 'success');
     });
 
     window.deleteAlert = function(id) {
@@ -654,23 +698,35 @@
     };
 
     function checkPriceAlerts(symbol, currentPrice) {
-      let triggeredIds = [];
+      let toRemoveIds = [];
+      let needsUpdate = false;
+      
       priceAlerts.forEach(a => {
-        if (a.ticker === symbol) {
+        if (a.ticker === symbol && a.isActive) {
           if (a.condition === '>' && currentPrice >= a.price) {
-            showToast(`🚨 價位觸發！${a.ticker} 已到達或突破 ${a.price}`, 'success');
+            showToast(`🚨 價位觸發！${a.ticker} 已漲到 ${a.price}`, 'success');
             playAlertSound();
-            triggeredIds.push(a.id);
+            if (a.type === 'once') {
+              toRemoveIds.push(a.id); // 單次：觸發後直接銷毀刪除
+            } else {
+              a.isActive = false; // 持續：觸發後僅關閉開關，保留紀錄
+            }
+            needsUpdate = true;
           } else if (a.condition === '<' && currentPrice <= a.price) {
-            showToast(`📉 價位觸發！${a.ticker} 已跌至或低於 ${a.price}`, 'error');
+            showToast(`📉 價位觸發！${a.ticker} 已跌到 ${a.price}`, 'error');
             playAlertSound();
-            triggeredIds.push(a.id);
+            if (a.type === 'once') {
+              toRemoveIds.push(a.id); // 單次：觸發後直接銷毀刪除
+            } else {
+              a.isActive = false; // 持續：觸發後僅關閉開關，保留紀錄
+            }
+            needsUpdate = true;
           }
         }
       });
       
-      if (triggeredIds.length > 0) {
-        priceAlerts = priceAlerts.filter(a => !triggeredIds.includes(a.id));
+      if (toRemoveIds.length > 0 || needsUpdate) {
+        priceAlerts = priceAlerts.filter(a => !toRemoveIds.includes(a.id));
         localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
         renderAlerts();
       }
