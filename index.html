@@ -81,6 +81,29 @@
     </div>
   </div>
 
+  <!-- API 設置專用 Modal -->
+  <div id="apiSettingsModal" class="fixed inset-0 z-[999] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-[#1e1e1e] border border-[#333] p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4">
+      <h3 class="text-white font-bold mb-4 text-lg">🔑 報價 API 設置</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-bold text-[#2979ff] mb-1">Finnhub API Key</label>
+          <div class="text-[9px] text-slate-500 mb-1.5">優點：每分鐘 60 次，適合每秒刷新。缺點：僅包含 BATS 交易所流動性。</div>
+          <input id="finnhubKeyInput" type="text" class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-[#00e676] mb-1">Twelve Data API Key</label>
+          <div class="text-[9px] text-slate-500 mb-1.5">優點：全市場綜合報價，100% 精準。缺點：免費版每分鐘限 8 次。</div>
+          <input id="twelveDataKeyInput" type="text" class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#00e676] outline-none">
+        </div>
+      </div>
+      <div class="flex justify-end space-x-3 mt-6">
+        <button id="apiModalCancel" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-[#333] transition-colors">取消</button>
+        <button id="apiModalSave" class="px-4 py-2 rounded-lg text-sm font-bold bg-[#2979ff] hover:bg-[#1c54b2] text-white transition-colors">儲存</button>
+      </div>
+    </div>
+  </div>
+
   <div class="max-w-7xl mx-auto space-y-4">
     
     <!-- 標題區塊 -->
@@ -108,11 +131,14 @@
         <div class="card-panel p-3 rounded-xl">
           <div class="flex justify-between items-center mb-2">
             <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">市場報價</h2>
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center space-x-1.5">
+              <select id="dataSourceSelect" class="bg-[#2a2a2a] text-[9px] text-white border border-[#444] rounded px-1 py-0.5 outline-none font-bold cursor-pointer focus:border-[#2979ff]">
+                <option value="finnhub">來源: Finnhub</option>
+                <option value="twelvedata">來源: TwelveData</option>
+              </select>
               <label class="flex items-center text-[10px] text-slate-400 cursor-pointer hover:text-white transition-colors">
                 <input type="checkbox" id="autoRefreshCheckbox" class="mr-1 rounded border-[#444] bg-[#2a2a2a] text-[#2979ff] focus:ring-0">
-                每
-                <input type="number" id="refreshIntervalInput" value="2" min="1" class="mx-1 w-7 text-center bg-transparent border-none p-0 text-[#2979ff] font-bold"> 秒刷新
+                <input type="number" id="refreshIntervalInput" value="2" min="1" class="w-7 text-center bg-transparent border-none p-0 text-[#2979ff] font-bold"> 秒
               </label>
               <span class="text-[10px] font-normal cursor-help" title="連線正常">🟢</span>
             </div>
@@ -337,9 +363,11 @@
     const STORAGE_KEY_TICKERS = 'savedTickers_PRO';
     const STORAGE_KEY_INTERVAL = 'savedChartInterval_PRO';
     const STORAGE_KEY_FINNHUB = 'finnhub_saved_key_v3';
+    const STORAGE_KEY_TWELVEDATA = 'twelvedata_saved_key_v1';
     const STORAGE_KEY_ALERTS = 'stockCalcAlerts_PRO';
 
     let FINNHUB_API_KEY = localStorage.getItem(STORAGE_KEY_FINNHUB) || 'd730469r01qn7f075d8gd730469r01qn7f075d90';
+    let TWELVE_DATA_API_KEY = localStorage.getItem(STORAGE_KEY_TWELVEDATA) || 'c56ad44f83f64dcf936b8340786e0887';
 
     let records = [];
     let tradeHistory = [];
@@ -364,9 +392,16 @@
       uModalInput: document.getElementById('uModalInput'),
       uModalBtnCancel: document.getElementById('uModalBtnCancel'),
       uModalBtnConfirm: document.getElementById('uModalBtnConfirm'),
+      
+      apiSettingsModal: document.getElementById('apiSettingsModal'),
+      finnhubKeyInput: document.getElementById('finnhubKeyInput'),
+      twelveDataKeyInput: document.getElementById('twelveDataKeyInput'),
+      apiModalCancel: document.getElementById('apiModalCancel'),
+      apiModalSave: document.getElementById('apiModalSave'),
 
       // Settings & Inputs
       apiKeyBtn: document.getElementById('apiKeyBtn'),
+      dataSourceSelect: document.getElementById('dataSourceSelect'),
       tickerInputContainer: document.getElementById('tickerInputContainer'),
       tickerDropdown: document.getElementById('tickerDropdown'),
       tickerInput: document.getElementById('tickerInput'),
@@ -471,11 +506,30 @@
       els.universalModal.classList.remove('flex');
     }
 
-    // --- 工具函式 ---
-    function formatNumber(num, decimals = 2) {
-      return new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num);
-    }
-    
+    // --- API Key 設置專屬 Modal ---
+    els.apiKeyBtn.addEventListener('click', () => {
+      els.finnhubKeyInput.value = FINNHUB_API_KEY;
+      els.twelveDataKeyInput.value = TWELVE_DATA_API_KEY;
+      els.apiSettingsModal.classList.remove('hidden');
+      els.apiSettingsModal.classList.add('flex');
+    });
+
+    els.apiModalCancel.addEventListener('click', () => {
+      els.apiSettingsModal.classList.add('hidden');
+      els.apiSettingsModal.classList.remove('flex');
+    });
+
+    els.apiModalSave.addEventListener('click', () => {
+      FINNHUB_API_KEY = els.finnhubKeyInput.value.trim();
+      TWELVE_DATA_API_KEY = els.twelveDataKeyInput.value.trim();
+      localStorage.setItem(STORAGE_KEY_FINNHUB, FINNHUB_API_KEY);
+      localStorage.setItem(STORAGE_KEY_TWELVEDATA, TWELVE_DATA_API_KEY);
+      
+      els.apiSettingsModal.classList.add('hidden');
+      els.apiSettingsModal.classList.remove('flex');
+      showToast('✅ API Keys 已儲存更新', 'success');
+    });
+
     // --- 桌面通知 (Browser Notification) ---
     function requestNotificationPermission() {
       if ('Notification' in window && Notification.permission === 'default') {
@@ -490,12 +544,16 @@
           body: body,
           icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>'
         });
-        // 點擊通知時自動切回網頁視窗
         notification.onclick = function() {
           window.focus();
           this.close();
         };
       }
+    }
+
+    // --- 工具函式 ---
+    function formatNumber(num, decimals = 2) {
+      return new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num);
     }
 
     // --- 音效設定區塊 ---
@@ -519,32 +577,27 @@
       try { 
         if (currentVolume > 0) {
           alertAudio.volume = currentVolume;
-          alertAudio.currentTime = 0; // 重置時間，允許連續播放
+          alertAudio.currentTime = 0; 
           alertAudio.play().catch(()=>{}); 
         }
       } catch(e) {}
     }
 
-    // 綁定音量控制拉桿
     els.alertVolume.value = currentVolume;
     els.alertVolume.addEventListener('input', (e) => {
       currentVolume = parseFloat(e.target.value);
       localStorage.setItem('stockCalcVolume_PRO', currentVolume);
-      playAlertSound(); // 拖曳時播放一聲預覽音量
+      playAlertSound(); 
     });
 
-    // 綁定自訂音效上傳
     els.soundUploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      
-      // 限制 2MB 以免超出 LocalStorage 容量
       if (file.size > 2 * 1024 * 1024) {
         showToast('檔案過大！請上傳小於 2MB 的音效檔', 'error');
         e.target.value = '';
         return;
       }
-
       const reader = new FileReader();
       reader.onload = function(evt) {
         customSoundData = evt.target.result;
@@ -558,7 +611,6 @@
       e.target.value = '';
     });
 
-    // 綁定重置音效
     els.resetSoundBtn.addEventListener('click', () => {
       customSoundData = null;
       localStorage.removeItem('stockCalcCustomSound_PRO');
@@ -568,8 +620,6 @@
       playAlertSound();
     });
 
-    const svgIconUp = `<svg class="inline mr-1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`;
-    const svgIconDown = `<svg class="inline mr-1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>`;
     const svgIconTrash = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`;
     const svgIconBell = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>`;
 
@@ -589,6 +639,7 @@
         els.currentPriceDisp.value = saved.currentPrice || '';
         els.autoRefreshCheckbox.checked = saved.autoRefresh || false;
         els.refreshIntervalInput.value = saved.refreshInterval || 2;
+        if(saved.dataSource) els.dataSourceSelect.value = saved.dataSource;
       }
       tradeHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY)) || [];
       els.chartIntervalSelect.value = currentChartInterval;
@@ -641,10 +692,7 @@
     // --- 價位提醒邏輯 ---
     function renderAlerts() {
       const currentSym = els.tickerInput.value.toUpperCase().trim();
-      
-      if(els.alertCountDisplay) {
-        els.alertCountDisplay.textContent = priceAlerts.length;
-      }
+      if(els.alertCountDisplay) els.alertCountDisplay.textContent = priceAlerts.length;
 
       if (priceAlerts.length === 0) {
         els.alertList.innerHTML = '<div class="text-center text-xs text-slate-500 py-3">尚無設定任何提醒</div>';
@@ -652,9 +700,7 @@
       }
       
       els.alertList.innerHTML = priceAlerts.map(a => {
-        // 確保向後相容舊資料
         if (a.isActive === undefined) a.isActive = true;
-        
         const isUp = a.condition === '>';
         const iconSvg = isUp 
           ? '<svg class="text-[#00e676]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
@@ -676,9 +722,7 @@
             </div>
           </div>
           <div class="flex items-center space-x-3">
-            <button onclick="deleteAlert('${a.id}')" class="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="刪除">
-              ${svgIconTrash}
-            </button>
+            <button onclick="deleteAlert('${a.id}')" class="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="刪除">${svgIconTrash}</button>
             <label class="cursor-pointer relative inline-block w-10 h-5 rounded-full">
               <input type="checkbox" class="sr-only peer" ${a.isActive ? 'checked' : ''} onchange="toggleAlert('${a.id}', this.checked)">
               <div class="w-10 h-5 bg-[#444] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[20px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#ff6b00]"></div>
@@ -692,7 +736,7 @@
       const alert = priceAlerts.find(a => a.id === id);
       if (alert) {
         alert.isActive = isChecked;
-        if(!isChecked) alert.isTriggered = false; // 關閉時重置觸發狀態，以便下次重新啟用時可報警
+        if(!isChecked) alert.isTriggered = false; 
         localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
         renderAlerts();
       }
@@ -705,7 +749,7 @@
       
       const p = parseFloat(els.alertPrice.value);
       const c = els.alertCondition.value;
-      const t = els.alertType ? els.alertType.value : 'once'; // 防錯處理
+      const t = els.alertType ? els.alertType.value : 'once';
       
       priceAlerts.unshift({ id: Date.now().toString(), ticker: sym, condition: c, price: p, type: t, isTriggered: false, isActive: true });
       localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
@@ -714,7 +758,6 @@
       renderAlerts();
       showToast(`✅ 已新增提醒：當 ${sym} ${c === '>' ? '漲到' : '跌到'} ${p} 時通知`, 'success');
       
-      // 請求瀏覽器桌面通知權限
       requestNotificationPermission();
     });
 
@@ -735,9 +778,9 @@
               sendBrowserNotification('🚨 價位觸發！', msg);
               playAlertSound();
               if (a.type === 'once') {
-                a.isActive = false; // 單次提醒觸發後關閉開關，保留紀錄
+                a.isActive = false; 
               } else {
-                a.isTriggered = true; // 多次提醒標記為已觸發
+                a.isTriggered = true; 
               }
               needsUpdate = true;
             }
@@ -748,14 +791,13 @@
               sendBrowserNotification('📉 價位觸發！', msg);
               playAlertSound();
               if (a.type === 'once') {
-                a.isActive = false; // 單次提醒觸發後關閉開關，保留紀錄
+                a.isActive = false;
               } else {
-                a.isTriggered = true; // 多次提醒標記為已觸發
+                a.isTriggered = true;
               }
               needsUpdate = true;
             }
           } else {
-            // 若價格離開了觸發區間，重置多次提醒的狀態，讓它下次能再次觸發
             if (a.isTriggered && a.type === 'multi') {
               a.isTriggered = false;
               needsUpdate = true;
@@ -794,21 +836,22 @@
       });
     }
 
-    // --- API & 核心邏輯 ---
-    els.apiKeyBtn.addEventListener('click', () => {
-      showModal({
-        type: 'prompt',
-        title: '🔑 設置 Finnhub API Key',
-        text: '請貼上您的 20 碼 API Key 以確保報價無限制更新：',
-        inputValue: FINNHUB_API_KEY,
-        onConfirm: (newKey) => {
-          if (newKey && newKey.trim()) { 
-            FINNHUB_API_KEY = newKey.trim(); 
-            localStorage.setItem(STORAGE_KEY_FINNHUB, FINNHUB_API_KEY);
-            showToast('API Key 已儲存更新', 'success');
+    // --- 報價來源與 API 邏輯 ---
+    
+    // 當切換為 Twelve Data 時，自動防呆確保刷新頻率不過高
+    els.dataSourceSelect.addEventListener('change', (e) => {
+      const source = e.target.value;
+      if (source === 'twelvedata') {
+        if (parseFloat(els.refreshIntervalInput.value) < 10) {
+          els.refreshIntervalInput.value = 10;
+          showToast('已切換為全市場報價。為配合免費額度，已將刷新間距調整為 10 秒', 'info');
+          if (els.autoRefreshCheckbox.checked) {
+            clearInterval(quoteInterval);
+            quoteInterval = setInterval(fetchQuoteOnly, 10000);
           }
         }
-      });
+      }
+      saveData();
     });
 
     function renderTradingViewWidget(symbol, interval) {
@@ -847,42 +890,69 @@
       
       if (symbol !== currentChartSymbol) renderTradingViewWidget(symbol, currentChartInterval);
       
+      const source = els.dataSourceSelect.value;
+
       try {
-        const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`);
-        if (res.status === 401) return showToast('API Key 無效或過期，請重新設置', 'error');
-        if (res.status === 429) return showToast('API 呼叫頻率過高，請稍候', 'error');
-        
-        const data = await res.json();
-        if (data && data.c) { 
-          els.currentPriceDisp.value = data.c; 
-          updateCurrentPriceColor(); 
-          checkPriceAlerts(symbol, data.c);
-          saveData(); 
+        if (source === 'finnhub') {
+          const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`);
+          if (res.status === 401) return showToast('Finnhub API Key 無效，請重新設置', 'error');
+          if (res.status === 429) return showToast('API 呼叫頻率過高，請稍候', 'error');
+          const data = await res.json();
+          if (data && data.c) { 
+            els.currentPriceDisp.value = data.c; 
+            updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c); saveData(); 
+          }
+        } else {
+          // Twelve Data API 邏輯
+          const res = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${TWELVE_DATA_API_KEY}`);
+          const data = await res.json();
+          if (data.code === 429) return showToast('Twelve Data 頻率達免費上限 (每分鐘8次)', 'error');
+          if (data.code === 401) return showToast('Twelve Data API Key 無效，請重新設置', 'error');
+          
+          if (data && data.price) {
+            const price = parseFloat(data.price);
+            els.currentPriceDisp.value = price;
+            updateCurrentPriceColor(); checkPriceAlerts(symbol, price); saveData();
+          } else {
+             showToast('無法取得該代號之全市場報價', 'error');
+          }
         }
       } catch (err) { 
         console.error(err); 
       } finally { 
-        els.fetchBtn.textContent = "抓取"; 
-        els.fetchBtn.disabled = false; 
+        els.fetchBtn.textContent = "抓取"; els.fetchBtn.disabled = false; 
       }
     }
 
     async function fetchQuoteOnly() {
       const symbol = els.tickerInput.value.toUpperCase().trim();
       if (!symbol) return;
+      const source = els.dataSourceSelect.value;
+
       try {
-        const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`);
-        if (res.status === 429) {
-          els.autoRefreshCheckbox.checked = false;
-          clearInterval(quoteInterval);
-          showToast('自動刷新已暫停 (達 API 限制)', 'error');
-          return;
-        }
-        const data = await res.json();
-        if (data && data.c && parseFloat(els.currentPriceDisp.value) !== data.c) { 
-          els.currentPriceDisp.value = data.c; 
-          updateCurrentPriceColor(); 
-          checkPriceAlerts(symbol, data.c);
+        if (source === 'finnhub') {
+          const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`);
+          if (res.status === 429) {
+            els.autoRefreshCheckbox.checked = false; clearInterval(quoteInterval);
+            showToast('自動刷新暫停 (達 Finnhub API 限制)', 'error'); return;
+          }
+          const data = await res.json();
+          if (data && data.c && parseFloat(els.currentPriceDisp.value) !== data.c) { 
+            els.currentPriceDisp.value = data.c; updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c);
+          }
+        } else {
+           const res = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${TWELVE_DATA_API_KEY}`);
+           const data = await res.json();
+           if (data.code === 429) {
+              els.autoRefreshCheckbox.checked = false; clearInterval(quoteInterval);
+              showToast('自動刷新暫停 (達 TwelveData API 限制)', 'error'); return;
+           }
+           if (data && data.price) {
+              const price = parseFloat(data.price);
+              if (parseFloat(els.currentPriceDisp.value) !== price) {
+                els.currentPriceDisp.value = price; updateCurrentPriceColor(); checkPriceAlerts(symbol, price);
+              }
+           }
         }
       } catch (err) {}
     }
@@ -916,7 +986,8 @@
     function saveData() {
       localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({
         records, ticker: els.tickerInput.value, currentPrice: els.currentPriceDisp.value,
-        autoRefresh: els.autoRefreshCheckbox.checked, refreshInterval: els.refreshIntervalInput.value
+        autoRefresh: els.autoRefreshCheckbox.checked, refreshInterval: els.refreshIntervalInput.value,
+        dataSource: els.dataSourceSelect.value
       }));
     }
 
@@ -995,7 +1066,7 @@
       if (isNaN(v)) { 
         els.currentPnlAmountDisp.textContent = '-'; 
         els.currentPnlPercentDisp.textContent = '-'; 
-        renderTable(); // 清空股價時同步更新表格
+        renderTable(); 
         return; 
       }
       const c = (averagePrice > 0 && v > averagePrice) ? '#00e676' : (averagePrice > 0 && v < averagePrice) ? '#ff5252' : '#fff';
@@ -1005,7 +1076,7 @@
         els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (p > 0 ? '+' : '') + formatNumber(p);
         els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (p > 0 ? '+' : '') + formatNumber((p/totalCost)*100) + '%';
       }
-      renderTable(); // 價格跳動時，同步觸發單筆紀錄盈虧計算
+      renderTable(); 
     }
     els.currentPriceDisp.addEventListener('input', updateCurrentPriceColor);
 
@@ -1037,7 +1108,6 @@
       els.recordsTableBody.innerHTML = records.map(r => {
         let pnlHtml = '<td class="px-6 py-3 text-slate-500">-</td>';
         
-        // 若有當前報價，則計算每筆獨立盈虧
         if (!isNaN(currentPrice)) {
           const rowPnl = (currentPrice - r.price) * r.quantity;
           const rowPnlPct = ((currentPrice - r.price) / r.price) * 100;
@@ -1072,7 +1142,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       loadAndMigrateData();
-      updateSoundUI(); // 確保剛載入時 UI 顯示正確的音效狀態
+      updateSoundUI(); 
       if(els.tickerInput.value) { 
         fetchStockData(); 
         if(els.autoRefreshCheckbox.checked) quoteInterval = setInterval(fetchQuoteOnly, (els.refreshIntervalInput.value||2)*1000); 
