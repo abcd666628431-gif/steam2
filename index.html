@@ -125,7 +125,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
       
       <!-- 左側：控制面板 -->
-      <div class="lg:col-span-4 space-y-3">
+      <div class="lg:col-span-5 space-y-3">
         
         <!-- API 抓價 -->
         <div class="card-panel p-3 rounded-xl">
@@ -253,8 +253,15 @@
             <div class="flex justify-between items-center mt-4 border-b border-[#333] pb-1">
               <span class="text-xs text-slate-400">提醒列表 (<span id="alertCountDisplay">0</span>)</span>
             </div>
-            <div id="alertList" class="mt-1 space-y-1 pb-2">
-              <!-- Alerts 列表 -->
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <div class="flex flex-col">
+                <div class="text-[10px] font-bold text-[#00e676] mb-1.5 text-center bg-[#00e676]/10 py-1 rounded">📈 漲破 (≥)</div>
+                <div id="alertListUp" class="space-y-1.5 pb-2"></div>
+              </div>
+              <div class="flex flex-col">
+                <div class="text-[10px] font-bold text-[#ff5252] mb-1.5 text-center bg-[#ff5252]/10 py-1 rounded">📉 跌破 (≤)</div>
+                <div id="alertListDown" class="space-y-1.5 pb-2"></div>
+              </div>
             </div>
             <div class="text-[9px] text-slate-500 mt-2 text-center">💡 背景刷新自動監控，可手動開關提醒</div>
           </div>
@@ -262,7 +269,7 @@
       </div>
 
       <!-- 右側：看板、圖表與列表 -->
-      <div class="lg:col-span-8 space-y-4">
+      <div class="lg:col-span-7 space-y-4">
         
         <!-- 核心看板 -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -427,7 +434,8 @@
       alertCondition: document.getElementById('alertCondition'),
       alertPrice: document.getElementById('alertPrice'),
       alertType: document.getElementById('alertType'),
-      alertList: document.getElementById('alertList'),
+      alertListUp: document.getElementById('alertListUp'),
+      alertListDown: document.getElementById('alertListDown'),
       alertCountDisplay: document.getElementById('alertCountDisplay'),
       alertVolume: document.getElementById('alertVolume'),
       soundUploadInput: document.getElementById('soundUploadInput'),
@@ -694,45 +702,44 @@
       const currentSym = els.tickerInput.value.toUpperCase().trim();
       if(els.alertCountDisplay) els.alertCountDisplay.textContent = priceAlerts.length;
 
-      if (priceAlerts.length === 0) {
-        els.alertList.innerHTML = '<div class="text-center text-xs text-slate-500 py-3">尚無設定任何提醒</div>';
-        return;
-      }
-
       // 自動按價格由大到小排序
       priceAlerts.sort((a, b) => b.price - a.price);
       
-      els.alertList.innerHTML = priceAlerts.map(a => {
-        if (a.isActive === undefined) a.isActive = true;
-        const isUp = a.condition === '>';
-        const iconSvg = isUp 
-          ? '<svg class="text-[#00e676]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
-          : '<svg class="text-[#ff5252]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
-        
-        const titleText = `價格${isUp ? '漲到' : '跌到'} ${a.price}`;
-        const typeText = a.type === 'multi' ? '持續提醒' : '單次提醒';
-        
-        return `
-        <div class="flex justify-between items-center py-2.5 px-2 border-b border-[#333] group relative transition-opacity ${a.ticker !== currentSym ? 'opacity-40 hover:opacity-100' : ''}">
-          <div class="flex items-start space-x-3">
-            <div class="mt-0.5">${iconSvg}</div>
-            <div class="flex flex-col">
-              <div class="flex items-center space-x-3 mb-1">
-                <span class="text-[13px] font-bold ${a.isActive ? 'text-slate-200' : 'text-slate-500'}">${titleText}</span>
-                <span class="text-[11px] ${a.isActive ? 'text-slate-400' : 'text-slate-600'} border-l border-[#444] pl-3">${typeText}</span>
+      const upAlerts = priceAlerts.filter(a => a.condition === '>');
+      const downAlerts = priceAlerts.filter(a => a.condition === '<');
+
+      const renderList = (list, isUpType) => {
+        if (list.length === 0) return '<div class="text-center text-[10px] text-slate-600 py-3">無設定</div>';
+        return list.map(a => {
+          if (a.isActive === undefined) a.isActive = true;
+          const typeText = a.type === 'multi' ? '持續' : '單次';
+          const priceColor = a.isActive ? (isUpType ? 'text-[#00e676]' : 'text-[#ff5252]') : 'text-slate-500';
+          
+          return `
+          <div class="flex flex-col py-1.5 px-2 border border-[#333] rounded-lg bg-[#2a2a2a] group relative transition-opacity ${a.ticker !== currentSym ? 'opacity-40 hover:opacity-100' : ''}">
+            <div class="flex justify-between items-center mb-0.5">
+              <span class="text-[13px] font-bold ${priceColor}">${a.price}</span>
+              <div class="flex items-center space-x-1.5">
+                <button onclick="deleteAlert('${a.id}')" class="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5" title="刪除">
+                  ${svgIconTrash}
+                </button>
+                <label class="cursor-pointer relative inline-block w-7 h-4 rounded-full">
+                  <input type="checkbox" class="sr-only peer" ${a.isActive ? 'checked' : ''} onchange="toggleAlert('${a.id}', this.checked)">
+                  <div class="w-7 h-4 bg-[#444] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[12px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#ff6b00]"></div>
+                </label>
               </div>
-              <div class="text-[11px] ${a.ticker !== currentSym ? 'text-[#2979ff] font-bold' : 'text-slate-500 font-medium tracking-wider'}">${a.ticker}</div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-[10px] ${a.ticker !== currentSym ? 'text-[#2979ff] font-bold' : 'text-slate-400 font-bold'}">${a.ticker}</span>
+              <span class="text-[9px] text-slate-500">${typeText}</span>
             </div>
           </div>
-          <div class="flex items-center space-x-3">
-            <button onclick="deleteAlert('${a.id}')" class="text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="刪除">${svgIconTrash}</button>
-            <label class="cursor-pointer relative inline-block w-10 h-5 rounded-full">
-              <input type="checkbox" class="sr-only peer" ${a.isActive ? 'checked' : ''} onchange="toggleAlert('${a.id}', this.checked)">
-              <div class="w-10 h-5 bg-[#444] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[20px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#ff6b00]"></div>
-            </label>
-          </div>
-        </div>
-      `}).join('');
+          `
+        }).join('');
+      };
+
+      els.alertListUp.innerHTML = renderList(upAlerts, true);
+      els.alertListDown.innerHTML = renderList(downAlerts, false);
     }
 
     window.toggleAlert = function(id, isChecked) {
