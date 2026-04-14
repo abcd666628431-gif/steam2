@@ -143,6 +143,51 @@
     </div>
   </div>
 
+  <!-- 修改歷史紀錄 Modal -->
+  <div id="editHistoryModal" class="fixed inset-0 z-[999] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-[#1e1e1e] border border-[#333] p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4">
+      <h3 class="text-white font-bold mb-4 text-lg">⚙️ 編輯歷史紀錄</h3>
+      <form id="editHistoryForm" class="space-y-3">
+        <input type="hidden" id="ehId">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="block text-[11px] font-bold text-slate-400 mb-1">交易日期</label>
+            <input type="date" id="ehDate" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 mb-1">代號</label>
+            <input type="text" id="ehSymbol" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none uppercase">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 mb-1">數量 (股)</label>
+            <input type="number" step="any" id="ehQty" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-[#2979ff] mb-1">買入價</label>
+            <input type="number" step="any" id="ehBuy" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-[#00e676] mb-1">賣出價</label>
+            <input type="number" step="any" id="ehSell" placeholder="選填" class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
+          </div>
+          <div class="col-span-2">
+            <label class="block text-[11px] font-bold text-[#ff5252] mb-1">手續費 / 稅金</label>
+            <input type="number" step="any" id="ehFee" placeholder="選填，預設為 0" class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
+          </div>
+        </div>
+        <div class="flex justify-between items-center mt-6 pt-4 border-t border-[#333]">
+          <button type="button" id="ehDeleteBtn" class="text-rose-500 hover:text-white hover:bg-rose-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center border border-rose-500/30 hover:border-transparent">
+            🗑️ 刪除紀錄
+          </button>
+          <div class="flex space-x-3">
+            <button type="button" onclick="closeEditHistoryModal()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-[#333] transition-colors">取消</button>
+            <button type="submit" class="px-4 py-2 rounded-lg text-sm font-bold bg-[#2979ff] hover:bg-[#1c54b2] text-white transition-colors shadow-lg">儲存修改</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 解除寬度限制：採用 max-w-[1600px] 大版面設計 -->
   <div class="max-w-[1600px] w-[96%] mx-auto space-y-4">
     
@@ -369,7 +414,6 @@
               <button id="clearBtn" class="hidden text-[10px] font-bold text-slate-500 hover:text-rose-500 transition-colors">RE-CALCULATE</button>
               <div id="historyActions" class="hidden flex items-center space-x-3">
                 <button onclick="openManualHistoryModal()" class="text-[10px] font-bold text-[#2979ff] hover:text-white transition-colors border border-[#2979ff]/40 px-2 py-0.5 rounded shadow-sm">➕ 手動加入</button>
-                <button id="clearHistoryBtn" class="text-[10px] font-bold text-slate-500 hover:text-rose-500 transition-colors">CLEAR HISTORY</button>
               </div>
             </div>
           </div>
@@ -546,7 +590,6 @@
       reportView: document.getElementById('reportView'),
       historyActions: document.getElementById('historyActions'),
       historyTableBody: document.getElementById('historyTableBody'),
-      clearHistoryBtn: document.getElementById('clearHistoryBtn'),
       historyCount: document.getElementById('historyCount'),
 
       // Report
@@ -662,13 +705,12 @@
       const dateObj = new Date(dateVal);
       const timeStr = dateObj.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
       
-      // 以選擇的日期時間戳作為 ID (加上隨機數防衝突)
       const idStr = dateObj.getTime().toString() + Math.floor(Math.random()*1000).toString() + 'h';
 
       tradeHistory.unshift({ 
         id: idStr, 
         time: timeStr, 
-        dateStr: dateVal, // 用於日曆辨識
+        dateStr: dateVal, 
         ticker: sym, 
         price: buy, 
         quantity: qty,
@@ -679,7 +721,7 @@
       tradeHistory.sort((a,b) => {
         let timeA = a.dateStr ? new Date(a.dateStr).getTime() : parseInt(a.id);
         let timeB = b.dateStr ? new Date(b.dateStr).getTime() : parseInt(b.id);
-        return timeB - timeA; // 新的在上面
+        return timeB - timeA; 
       });
 
       localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
@@ -689,6 +731,70 @@
       closeManualHistoryModal();
       document.getElementById('manualHistoryForm').reset();
       showToast('✅ 手動紀錄已加入', 'success');
+    });
+
+    // --- 編輯歷史紀錄邏輯 ---
+    window.openEditHistoryModal = function(id) {
+      const rec = tradeHistory.find(r => r.id === id);
+      if (!rec) return;
+
+      document.getElementById('ehId').value = rec.id;
+      document.getElementById('ehDate').value = rec.dateStr || new Date().toISOString().split('T')[0];
+      document.getElementById('ehSymbol').value = rec.ticker;
+      document.getElementById('ehQty').value = rec.quantity;
+      document.getElementById('ehBuy').value = rec.price;
+      document.getElementById('ehSell').value = rec.sellPrice !== undefined ? rec.sellPrice : '';
+      document.getElementById('ehFee').value = rec.fee !== undefined ? rec.fee : '';
+
+      document.getElementById('editHistoryModal').classList.remove('hidden');
+      document.getElementById('editHistoryModal').classList.add('flex');
+    };
+
+    window.closeEditHistoryModal = function() {
+      document.getElementById('editHistoryModal').classList.add('hidden');
+      document.getElementById('editHistoryModal').classList.remove('flex');
+    };
+
+    document.getElementById('editHistoryForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('ehId').value;
+      const rec = tradeHistory.find(r => r.id === id);
+      if (!rec) return;
+
+      rec.dateStr = document.getElementById('ehDate').value;
+      const dateObj = new Date(rec.dateStr);
+      rec.time = dateObj.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
+      rec.ticker = document.getElementById('ehSymbol').value.toUpperCase().trim();
+      rec.quantity = parseFloat(document.getElementById('ehQty').value);
+      rec.price = parseFloat(document.getElementById('ehBuy').value);
+      
+      const sellVal = document.getElementById('ehSell').value;
+      rec.sellPrice = sellVal ? parseFloat(sellVal) : undefined;
+      
+      const feeVal = document.getElementById('ehFee').value;
+      rec.fee = feeVal ? parseFloat(feeVal) : 0;
+
+      tradeHistory.sort((a,b) => {
+        let timeA = a.dateStr ? new Date(a.dateStr).getTime() : parseInt(a.id);
+        let timeB = b.dateStr ? new Date(b.dateStr).getTime() : parseInt(b.id);
+        return timeB - timeA;
+      });
+
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+      renderHistoryTable();
+      if(activeRecordsTab === 'report') renderReport();
+      
+      closeEditHistoryModal();
+      showToast('✅ 紀錄已更新', 'success');
+    });
+
+    document.getElementById('ehDeleteBtn').addEventListener('click', () => {
+      const id = document.getElementById('ehId').value;
+      if(confirm('確定要永久刪除此筆交易紀錄嗎？')) {
+        deleteHistoryRecord(id);
+        closeEditHistoryModal();
+        showToast('🗑️ 紀錄已刪除', 'info');
+      }
     });
 
     // --- 桌面通知 (Browser Notification) ---
@@ -788,6 +894,7 @@
     }
 
     const svgIconTrash = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`;
+    const svgIconSettings = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
 
     // --- 資料加載與自動遷移邏輯 ---
     function loadAndMigrateData() {
@@ -862,7 +969,6 @@
       const currentSym = els.tickerInput ? els.tickerInput.value.toUpperCase().trim() : '';
       if(els.alertCountDisplay) els.alertCountDisplay.textContent = priceAlerts.length;
 
-      // 自動按價格由大到小排序
       priceAlerts.sort((a, b) => b.price - a.price);
       
       const upAlerts = priceAlerts.filter(a => a.condition === '>');
@@ -1010,7 +1116,7 @@
       const [year, month] = pickerVal.split('-').map(Number);
 
       const currency = els.reportCurrencySelect ? els.reportCurrencySelect.value : 'USD';
-      const multiplier = currency === 'MOP' ? 8 : 1; // USD 兌 MOP 匯率 1:8
+      const multiplier = currency === 'MOP' ? 8 : 1; 
       if (els.reportCurrencyLabel) els.reportCurrencyLabel.textContent = currency;
 
       const daysInMonth = new Date(year, month, 0).getDate();
@@ -1023,7 +1129,6 @@
         const sPrice = parseFloat(r.sellPrice);
         if (isNaN(sPrice)) return; 
 
-        // 解析紀錄日期
         let recordDate;
         if (r.dateStr) {
           recordDate = new Date(r.dateStr);
@@ -1046,7 +1151,6 @@
         gridHtml += `<div class="p-1 min-h-[75px]"></div>`;
       }
 
-      // 取得今天日期(歸零時間)供比對，判斷是否為未來日期
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -1060,7 +1164,7 @@
         const isFuture = cellDate > today;
 
         if (profit !== undefined && profit !== 0) {
-          profit = profit * multiplier; // 顯示前套用匯率轉換
+          profit = profit * multiplier; 
           if (profit > 0) {
             bgClass = 'bg-[#00e676]/10 border border-[#00e676]/20 shadow-sm';
             textClass = 'text-[#00e676]';
@@ -1072,7 +1176,7 @@
           }
         } else {
           if (isFuture) {
-            profitStr = ''; // 未到的日子隱藏金額
+            profitStr = ''; 
           }
         }
 
@@ -1086,14 +1190,13 @@
 
       els.reportCalendarGrid.innerHTML = gridHtml;
       
-      const displayTotal = monthlyTotal * multiplier; // 總計套用匯率轉換
+      const displayTotal = monthlyTotal * multiplier; 
       els.reportMonthTotal.textContent = (displayTotal > 0 ? '+' : '') + formatNumber(displayTotal);
       els.reportMonthTotal.className = `text-3xl font-bold tracking-tight ${displayTotal >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`;
     }
 
     if(els.reportMonthPicker) {
       els.reportMonthPicker.addEventListener('change', renderReport);
-      // 預設為當前月份
       const now = new Date();
       els.reportMonthPicker.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
@@ -1392,7 +1495,7 @@
         tradeHistory.unshift({ 
           id: Date.now().toString()+'h', 
           time: timeStr, 
-          dateStr: now.toISOString().split('T')[0], // 供日曆使用
+          dateStr: now.toISOString().split('T')[0], 
           ticker: s, price: p, quantity: q 
         });
         
@@ -1417,20 +1520,14 @@
       if (record) {
         record[field] = value;
         localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
-        renderHistoryTable(); 
-        if(activeRecordsTab === 'report') renderReport(); // 同步更新日曆
+        renderHistoryTable();
+        if(activeRecordsTab === 'report') renderReport();
       }
     };
 
     if(els.clearBtn) {
       els.clearBtn.addEventListener('click', () => { 
         showModal({ type: 'confirm', text: '確定要清空當前所有倉位紀錄嗎？', onConfirm: () => { records = []; calculateCore(); showToast('紀錄已清空'); } });
-      });
-    }
-    
-    if(els.clearHistoryBtn) {
-      els.clearHistoryBtn.addEventListener('click', () => { 
-        showModal({ type: 'confirm', text: '確定要清空所有歷史建倉紀錄嗎？', onConfirm: () => { tradeHistory = []; renderHistoryTable(); localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory)); showToast('歷史紀錄已清空'); } });
       });
     }
 
@@ -1464,7 +1561,30 @@
     function renderHistoryTable() {
       if(els.historyCount) els.historyCount.textContent = tradeHistory.length;
       if(els.historyTableBody) {
-        els.historyTableBody.innerHTML = tradeHistory.map(r => {
+        let currentMonthStr = '';
+        let htmlStr = '';
+
+        tradeHistory.forEach(r => {
+          // 解析這筆紀錄的月份
+          let recordDate;
+          if (r.dateStr) {
+            recordDate = new Date(r.dateStr);
+          } else {
+            const ts = parseInt(r.id);
+            recordDate = ts ? new Date(ts) : new Date();
+          }
+          const monthStr = `${recordDate.getFullYear()} 年 ${recordDate.getMonth() + 1} 月`;
+
+          // 如果遇到新的月份，就插入一條分隔橫幅
+          if (monthStr !== currentMonthStr) {
+            htmlStr += `
+              <tr class="bg-[#2a2a2a]/80">
+                <td colspan="8" class="px-4 py-1.5 text-xs font-bold text-[#2979ff] border-y border-[#333] tracking-widest">${monthStr}</td>
+              </tr>
+            `;
+            currentMonthStr = monthStr;
+          }
+
           let pnlHtml = '<span class="text-slate-600">-</span>';
           const sPrice = parseFloat(r.sellPrice);
           
@@ -1477,7 +1597,7 @@
             pnlHtml = `<span class="font-bold ${color}">${sign}${formatNumber(pnl)} <span class="text-[10px] opacity-70 ml-1">(${sign}${formatNumber(pnlPct)}%)</span></span>`;
           }
 
-          return `
+          htmlStr += `
           <tr class="hover:bg-white/[0.03] transition-colors">
             <td class="px-4 py-3 text-slate-600 font-mono whitespace-nowrap">${r.time}</td>
             <td class="px-4 py-3 font-bold text-[#2979ff] cursor-pointer whitespace-nowrap" onclick="selectTicker('${r.ticker}')">${r.ticker}</td>
@@ -1490,9 +1610,15 @@
               <input type="number" step="any" placeholder="-" value="${r.fee !== undefined ? r.fee : ''}" onchange="updateHistoryTrade('${r.id}', 'fee', this.value)" class="w-14 px-1.5 py-1 text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入手續費">
             </td>
             <td class="px-4 py-3 whitespace-nowrap">${pnlHtml}</td>
-            <td class="px-4 py-3 text-right whitespace-nowrap"><button onclick="deleteHistoryRecord('${r.id}')" class="text-slate-600 hover:text-rose-500 p-1">${svgIconTrash}</button></td>
-          </tr>`
-        }).join('');
+            <td class="px-4 py-3 text-right whitespace-nowrap">
+              <button onclick="openEditHistoryModal('${r.id}')" class="text-slate-500 hover:text-[#2979ff] p-1 transition-colors" title="設定與編輯">
+                ${svgIconSettings}
+              </button>
+            </td>
+          </tr>`;
+        });
+        
+        els.historyTableBody.innerHTML = htmlStr;
       }
     }
 
