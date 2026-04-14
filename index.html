@@ -345,15 +345,18 @@
             </table>
           </div>
 
-          <div id="historyRecordsView" class="hidden max-h-[300px] overflow-y-auto custom-scrollbar">
-            <table class="w-full text-left text-xs">
+          <div id="historyRecordsView" class="hidden max-h-[300px] overflow-auto custom-scrollbar">
+            <table class="w-full text-left text-xs min-w-[650px]">
               <thead class="sticky top-0 bg-[#1e1e1e] z-10 shadow-sm">
                 <tr class="text-slate-500 border-b border-[#333]">
-                  <th class="px-6 py-3 font-bold uppercase tracking-wider">時間</th>
-                  <th class="px-6 py-3 font-bold uppercase tracking-wider">代號</th>
-                  <th class="px-6 py-3 font-bold uppercase tracking-wider">數量</th>
-                  <th class="px-6 py-3 font-bold uppercase tracking-wider">價位</th>
-                  <th class="px-6 py-3 text-right">ACTION</th>
+                  <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">時間</th>
+                  <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">代號</th>
+                  <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">數量</th>
+                  <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">買入價</th>
+                  <th class="px-2 py-3 font-bold uppercase tracking-wider whitespace-nowrap text-center">賣出價</th>
+                  <th class="px-2 py-3 font-bold uppercase tracking-wider whitespace-nowrap text-center">手續費</th>
+                  <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">結算盈虧</th>
+                  <th class="px-4 py-3 text-right whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
               <tbody id="historyTableBody" class="divide-y divide-[#333]"></tbody>
@@ -1147,6 +1150,16 @@
     window.deleteRecord = (id) => { records = records.filter(r => r.id !== id); calculateCore(); };
     window.deleteHistoryRecord = (id) => { tradeHistory = tradeHistory.filter(r => r.id !== id); renderHistoryTable(); localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory)); };
     
+    // 新增：更新歷史紀錄中的賣出價與手續費
+    window.updateHistoryTrade = function(id, field, value) {
+      const record = tradeHistory.find(r => r.id === id);
+      if (record) {
+        record[field] = value;
+        localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+        renderHistoryTable(); // 重新渲染以更新盈虧
+      }
+    };
+
     if(els.clearBtn) {
       els.clearBtn.addEventListener('click', () => { 
         showModal({ type: 'confirm', text: '確定要清空當前所有倉位紀錄嗎？', onConfirm: () => { records = []; calculateCore(); showToast('紀錄已清空'); } });
@@ -1189,14 +1202,35 @@
     function renderHistoryTable() {
       if(els.historyCount) els.historyCount.textContent = tradeHistory.length;
       if(els.historyTableBody) {
-        els.historyTableBody.innerHTML = tradeHistory.map(r => `
+        els.historyTableBody.innerHTML = tradeHistory.map(r => {
+          let pnlHtml = '<span class="text-slate-600">-</span>';
+          const sPrice = parseFloat(r.sellPrice);
+          
+          if (!isNaN(sPrice)) {
+            const fee = parseFloat(r.fee) || 0;
+            const pnl = (sPrice - r.price) * r.quantity - fee;
+            const pnlPct = (pnl / (r.price * r.quantity)) * 100;
+            const color = pnl >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
+            const sign = pnl > 0 ? '+' : '';
+            pnlHtml = `<span class="font-bold ${color}">${sign}${formatNumber(pnl)} <span class="text-[10px] opacity-70 ml-1">(${sign}${formatNumber(pnlPct)}%)</span></span>`;
+          }
+
+          return `
           <tr class="hover:bg-white/[0.03] transition-colors">
-            <td class="px-6 py-3 text-slate-600 font-mono">${r.time}</td>
-            <td class="px-6 py-3 font-bold text-[#2979ff] cursor-pointer" onclick="selectTicker('${r.ticker}')">${r.ticker}</td>
-            <td class="px-6 py-3">${formatNumber(r.quantity)}</td>
-            <td class="px-6 py-3 text-slate-300">$${formatNumber(r.price, 4)}</td>
-            <td class="px-6 py-3 text-right"><button onclick="deleteHistoryRecord('${r.id}')" class="text-slate-600 hover:text-rose-500">${svgIconTrash}</button></td>
-          </tr>`).join('');
+            <td class="px-4 py-3 text-slate-600 font-mono whitespace-nowrap">${r.time}</td>
+            <td class="px-4 py-3 font-bold text-[#2979ff] cursor-pointer whitespace-nowrap" onclick="selectTicker('${r.ticker}')">${r.ticker}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${formatNumber(r.quantity)}</td>
+            <td class="px-4 py-3 text-slate-300 whitespace-nowrap">$${formatNumber(r.price, 4)}</td>
+            <td class="px-2 py-2 text-center">
+              <input type="number" step="any" placeholder="輸入" value="${r.sellPrice !== undefined ? r.sellPrice : ''}" onchange="updateHistoryTrade('${r.id}', 'sellPrice', this.value)" class="w-16 px-1.5 py-1 text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入賣出價">
+            </td>
+            <td class="px-2 py-2 text-center">
+              <input type="number" step="any" placeholder="0" value="${r.fee !== undefined ? r.fee : ''}" onchange="updateHistoryTrade('${r.id}', 'fee', this.value)" class="w-14 px-1.5 py-1 text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入手續費">
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">${pnlHtml}</td>
+            <td class="px-4 py-3 text-right whitespace-nowrap"><button onclick="deleteHistoryRecord('${r.id}')" class="text-slate-600 hover:text-rose-500 p-1">${svgIconTrash}</button></td>
+          </tr>`
+        }).join('');
       }
     }
 
