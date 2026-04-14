@@ -455,9 +455,11 @@
       return new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num);
     }
     
-    // 更換為輕柔的 UI 提示音 (Mixkit Soft Notification)
-    const softSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3';
-    const alertAudio = new Audio(softSoundUrl);
+    // --- 音效設定區塊 ---
+    // 💡 提示：若您想完全複製該網頁的聲音，請將該網頁的 .mp3 網址直接貼在下方的單引號內！
+    // 目前預設為您配置了專業量化終端常見的清脆提示音
+    const targetSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+    const alertAudio = new Audio(targetSoundUrl);
 
     function playAlertSound() {
       try { 
