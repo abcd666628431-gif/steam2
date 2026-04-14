@@ -476,6 +476,28 @@
       return new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num);
     }
     
+    // --- 桌面通知 (Browser Notification) ---
+    function requestNotificationPermission() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    function sendBrowserNotification(title, body) {
+      if (!('Notification' in window)) return;
+      if (Notification.permission === 'granted') {
+        const notification = new Notification(title, {
+          body: body,
+          icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>'
+        });
+        // 點擊通知時自動切回網頁視窗
+        notification.onclick = function() {
+          window.focus();
+          this.close();
+        };
+      }
+    }
+
     // --- 音效設定區塊 ---
     const defaultSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
     let customSoundData = localStorage.getItem('stockCalcCustomSound_PRO');
@@ -670,6 +692,7 @@
       const alert = priceAlerts.find(a => a.id === id);
       if (alert) {
         alert.isActive = isChecked;
+        if(!isChecked) alert.isTriggered = false; // 關閉時重置觸發狀態，以便下次重新啟用時可報警
         localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
         renderAlerts();
       }
@@ -684,12 +707,15 @@
       const c = els.alertCondition.value;
       const t = els.alertType ? els.alertType.value : 'once'; // 防錯處理
       
-      priceAlerts.unshift({ id: Date.now().toString(), ticker: sym, condition: c, price: p, type: t, isActive: true });
+      priceAlerts.unshift({ id: Date.now().toString(), ticker: sym, condition: c, price: p, type: t, isTriggered: false, isActive: true });
       localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
       
       els.alertPrice.value = '';
       renderAlerts();
       showToast(`✅ 已新增提醒：當 ${sym} ${c === '>' ? '漲到' : '跌到'} ${p} 時通知`, 'success');
+      
+      // 請求瀏覽器桌面通知權限
+      requestNotificationPermission();
     });
 
     window.deleteAlert = function(id) {
@@ -699,35 +725,46 @@
     };
 
     function checkPriceAlerts(symbol, currentPrice) {
-      let toRemoveIds = [];
       let needsUpdate = false;
-      
       priceAlerts.forEach(a => {
         if (a.ticker === symbol && a.isActive) {
           if (a.condition === '>' && currentPrice >= a.price) {
-            showToast(`🚨 價位觸發！${a.ticker} 已漲到 ${a.price}`, 'success');
-            playAlertSound();
-            if (a.type === 'once') {
-              toRemoveIds.push(a.id); // 單次：觸發後直接銷毀刪除
-            } else {
-              a.isActive = false; // 持續：觸發後僅關閉開關，保留紀錄
+            if (!a.isTriggered) {
+              const msg = `${a.ticker} 已漲到 ${a.price}`;
+              showToast(`🚨 價位觸發！${msg}`, 'success');
+              sendBrowserNotification('🚨 價位觸發！', msg);
+              playAlertSound();
+              if (a.type === 'once') {
+                a.isActive = false; // 單次提醒觸發後關閉開關，保留紀錄
+              } else {
+                a.isTriggered = true; // 多次提醒標記為已觸發
+              }
+              needsUpdate = true;
             }
-            needsUpdate = true;
           } else if (a.condition === '<' && currentPrice <= a.price) {
-            showToast(`📉 價位觸發！${a.ticker} 已跌到 ${a.price}`, 'error');
-            playAlertSound();
-            if (a.type === 'once') {
-              toRemoveIds.push(a.id); // 單次：觸發後直接銷毀刪除
-            } else {
-              a.isActive = false; // 持續：觸發後僅關閉開關，保留紀錄
+            if (!a.isTriggered) {
+              const msg = `${a.ticker} 已跌到 ${a.price}`;
+              showToast(`📉 價位觸發！${msg}`, 'error');
+              sendBrowserNotification('📉 價位觸發！', msg);
+              playAlertSound();
+              if (a.type === 'once') {
+                a.isActive = false; // 單次提醒觸發後關閉開關，保留紀錄
+              } else {
+                a.isTriggered = true; // 多次提醒標記為已觸發
+              }
+              needsUpdate = true;
             }
-            needsUpdate = true;
+          } else {
+            // 若價格離開了觸發區間，重置多次提醒的狀態，讓它下次能再次觸發
+            if (a.isTriggered && a.type === 'multi') {
+              a.isTriggered = false;
+              needsUpdate = true;
+            }
           }
         }
       });
       
-      if (toRemoveIds.length > 0 || needsUpdate) {
-        priceAlerts = priceAlerts.filter(a => !toRemoveIds.includes(a.id));
+      if (needsUpdate) {
         localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
         renderAlerts();
       }
