@@ -253,7 +253,7 @@
             <div class="flex justify-between items-center mt-4 border-b border-[#333] pb-1">
               <span class="text-xs text-slate-400">提醒列表 (<span id="alertCountDisplay">0</span>)</span>
             </div>
-            <div id="alertList" class="mt-1 space-y-1 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
+            <div id="alertList" class="mt-1 space-y-1 pb-2">
               <!-- Alerts 列表 -->
             </div>
             <div class="text-[9px] text-slate-500 mt-2 text-center">💡 背景刷新自動監控，可手動開關提醒</div>
@@ -698,6 +698,9 @@
         els.alertList.innerHTML = '<div class="text-center text-xs text-slate-500 py-3">尚無設定任何提醒</div>';
         return;
       }
+
+      // 自動按價格由大到小排序
+      priceAlerts.sort((a, b) => b.price - a.price);
       
       els.alertList.innerHTML = priceAlerts.map(a => {
         if (a.isActive === undefined) a.isActive = true;
