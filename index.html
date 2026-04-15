@@ -506,6 +506,10 @@
     let savedTickers = JSON.parse(localStorage.getItem(STORAGE_KEY_TICKERS)) || [];
     let priceAlerts = JSON.parse(localStorage.getItem(STORAGE_KEY_ALERTS)) || [];
     
+    // 新增：追蹤目前觸發長亮的卡片 ID 與計時器
+    let currentHighlightedAlertId = null;
+    let highlightTimeout = null;
+    
     let activeRecordsTab = 'current';
     let averagePrice = 0, totalShares = 0, totalCost = 0;
     let activeTargetMode = 'price'; 
@@ -989,8 +993,14 @@
           const typeText = a.type === 'multi' ? '持續' : '單次';
           const priceColor = a.isActive ? (isUpType ? 'text-[#00e676]' : 'text-[#ff5252]') : 'text-slate-400';
           
+          // 判斷是否為當前觸發長亮的卡片，給予光暈特效
+          const isHighlighted = (a.id === currentHighlightedAlertId);
+          const bgClass = isHighlighted ? (isUpType ? 'bg-[#00e676]/20' : 'bg-[#ff5252]/20') : 'bg-[#2a2a2a]';
+          const borderClass = isHighlighted ? (isUpType ? 'border-[#00e676]' : 'border-[#ff5252]') : 'border-[#444]';
+          const shadowClass = isHighlighted ? (isUpType ? 'shadow-[0_0_12px_rgba(0,230,118,0.6)]' : 'shadow-[0_0_12px_rgba(255,82,82,0.6)]') : '';
+          
           return `
-          <div class="flex flex-col py-1.5 px-2 border border-[#444] rounded-lg bg-[#2a2a2a] group relative transition-opacity ${a.ticker !== currentSym ? 'opacity-50 hover:opacity-100' : ''}">
+          <div class="flex flex-col py-1.5 px-2 border ${borderClass} rounded-lg ${bgClass} ${shadowClass} group relative transition-all duration-500 ${a.ticker !== currentSym ? 'opacity-50 hover:opacity-100' : ''}">
             <div class="flex justify-between items-center mb-0.5">
               <span class="text-[13px] font-bold ${priceColor}">${a.price}</span>
               <div class="flex items-center space-x-1.5">
@@ -1055,6 +1065,8 @@
 
     function checkPriceAlerts(symbol, currentPrice) {
       let needsUpdate = false;
+      let triggeredAlertId = null;
+
       priceAlerts.forEach(a => {
         if (a.ticker === symbol && a.isActive) {
           if (a.condition === '>' && currentPrice >= a.price) {
@@ -1068,6 +1080,7 @@
               } else {
                 a.isTriggered = true; 
               }
+              triggeredAlertId = a.id;
               needsUpdate = true;
             }
           } else if (a.condition === '<' && currentPrice <= a.price) {
@@ -1081,6 +1094,7 @@
               } else {
                 a.isTriggered = true;
               }
+              triggeredAlertId = a.id;
               needsUpdate = true;
             }
           } else {
@@ -1093,6 +1107,14 @@
       });
       
       if (needsUpdate) {
+        if (triggeredAlertId) {
+          currentHighlightedAlertId = triggeredAlertId;
+          if (highlightTimeout) clearTimeout(highlightTimeout);
+          highlightTimeout = setTimeout(() => {
+            currentHighlightedAlertId = null;
+            renderAlerts();
+          }, 60000); // 1分鐘後熄滅光暈
+        }
         localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
         renderAlerts();
       }
