@@ -1434,8 +1434,9 @@
         if (isNaN(sPrice)) return;
 
         const fee = parseFloat(r.fee) || 0;
-        const isShort = r.direction === 'short';
-        const pnl = isShort ? (r.price - sPrice) * r.quantity - fee : (sPrice - r.price) * r.quantity - fee;
+        
+        // 修正：取消多空反轉，統一恢復使用 (賣出價 - 買入價) * 數量 - 手續費 
+        const pnl = (sPrice - r.price) * r.quantity - fee;
 
         if (!aggregated[r.ticker]) aggregated[r.ticker] = 0;
         aggregated[r.ticker] += pnl;
