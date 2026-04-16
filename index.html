@@ -111,6 +111,18 @@
       <form id="manualHistoryForm" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
           <div class="col-span-2">
+            <div class="flex space-x-2 bg-[#2a2a2a] p-1 rounded-lg border border-[#444]">
+              <label class="flex-1 text-center cursor-pointer relative">
+                <input type="radio" name="mhDirection" value="long" class="peer sr-only" checked>
+                <div class="text-[11px] font-bold text-slate-400 py-1.5 rounded peer-checked:bg-[#00e676]/20 peer-checked:text-[#00e676] transition-all">🟢 做多 (看漲)</div>
+              </label>
+              <label class="flex-1 text-center cursor-pointer relative">
+                <input type="radio" name="mhDirection" value="short" class="peer sr-only">
+                <div class="text-[11px] font-bold text-slate-400 py-1.5 rounded peer-checked:bg-[#ff5252]/20 peer-checked:text-[#ff5252] transition-all">🔴 做空 (看跌)</div>
+              </label>
+            </div>
+          </div>
+          <div class="col-span-2">
             <label class="block text-[11px] font-bold text-slate-400 mb-1">交易日期</label>
             <input type="date" id="mhDate" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
@@ -123,11 +135,11 @@
             <input type="number" step="any" id="mhQty" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-[#2979ff] mb-1">買入價</label>
+            <label class="block text-[11px] font-bold text-[#2979ff] mb-1">建倉價</label>
             <input type="number" step="any" id="mhBuy" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-[#00e676] mb-1">賣出價</label>
+            <label class="block text-[11px] font-bold text-[#00e676] mb-1">平倉價</label>
             <input type="number" step="any" id="mhSell" placeholder="選填" class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
           <div class="col-span-2">
@@ -151,6 +163,18 @@
         <input type="hidden" id="ehId">
         <div class="grid grid-cols-2 gap-3">
           <div class="col-span-2">
+            <div class="flex space-x-2 bg-[#2a2a2a] p-1 rounded-lg border border-[#444]">
+              <label class="flex-1 text-center cursor-pointer relative">
+                <input type="radio" name="ehDirection" value="long" id="ehDirLong" class="peer sr-only" checked>
+                <div class="text-[11px] font-bold text-slate-400 py-1.5 rounded peer-checked:bg-[#00e676]/20 peer-checked:text-[#00e676] transition-all">🟢 做多 (看漲)</div>
+              </label>
+              <label class="flex-1 text-center cursor-pointer relative">
+                <input type="radio" name="ehDirection" value="short" id="ehDirShort" class="peer sr-only">
+                <div class="text-[11px] font-bold text-slate-400 py-1.5 rounded peer-checked:bg-[#ff5252]/20 peer-checked:text-[#ff5252] transition-all">🔴 做空 (看跌)</div>
+              </label>
+            </div>
+          </div>
+          <div class="col-span-2">
             <label class="block text-[11px] font-bold text-slate-400 mb-1">交易日期</label>
             <input type="date" id="ehDate" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
@@ -163,11 +187,11 @@
             <input type="number" step="any" id="ehQty" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-[#2979ff] mb-1">買入價</label>
+            <label class="block text-[11px] font-bold text-[#2979ff] mb-1">建倉價</label>
             <input type="number" step="any" id="ehBuy" required class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-[#00e676] mb-1">賣出價</label>
+            <label class="block text-[11px] font-bold text-[#00e676] mb-1">平倉價</label>
             <input type="number" step="any" id="ehSell" placeholder="選填" class="w-full px-3 py-2 text-sm rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none">
           </div>
           <div class="col-span-2">
@@ -253,6 +277,16 @@
             新增建倉紀錄
           </h2>
           <form id="addForm" class="space-y-2.5">
+            <div class="flex space-x-2 bg-[#2a2a2a] p-1 rounded-lg border border-[#444]">
+              <label class="flex-1 text-center cursor-pointer relative">
+                <input type="radio" name="tradeDirection" value="long" class="peer sr-only" checked>
+                <div class="text-[11px] font-bold text-slate-400 py-1.5 rounded peer-checked:bg-[#00e676]/20 peer-checked:text-[#00e676] transition-all">🟢 做多 (看漲)</div>
+              </label>
+              <label class="flex-1 text-center cursor-pointer relative">
+                <input type="radio" name="tradeDirection" value="short" class="peer sr-only">
+                <div class="text-[11px] font-bold text-slate-400 py-1.5 rounded peer-checked:bg-[#ff5252]/20 peer-checked:text-[#ff5252] transition-all">🔴 做空 (看跌)</div>
+              </label>
+            </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[11px] font-bold text-slate-200 mb-1">數量 (股)</label>
@@ -441,8 +475,8 @@
                   <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">時間</th>
                   <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">代號</th>
                   <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">數量</th>
-                  <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">買入價</th>
-                  <th class="px-2 py-3 font-bold uppercase tracking-wider whitespace-nowrap text-center">賣出價</th>
+                  <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">建倉價</th>
+                  <th class="px-2 py-3 font-bold uppercase tracking-wider whitespace-nowrap text-center">平倉價</th>
                   <th class="px-2 py-3 font-bold uppercase tracking-wider whitespace-nowrap text-center">手續費</th>
                   <th class="px-4 py-3 font-bold uppercase tracking-wider whitespace-nowrap">結算盈虧</th>
                   <th class="px-4 py-3 text-right whitespace-nowrap">ACTION</th>
@@ -705,6 +739,9 @@
       const buy = parseFloat(document.getElementById('mhBuy').value);
       const sell = document.getElementById('mhSell').value ? parseFloat(document.getElementById('mhSell').value) : undefined;
       const fee = document.getElementById('mhFee').value ? parseFloat(document.getElementById('mhFee').value) : 0;
+      
+      const dirRadio = document.querySelector('input[name="mhDirection"]:checked');
+      const dir = dirRadio ? dirRadio.value : 'long';
 
       const dateObj = new Date(dateVal);
       const timeStr = dateObj.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
@@ -719,9 +756,73 @@
         price: buy, 
         quantity: qty,
         sellPrice: sell,
-        fee: fee
+        fee: fee,
+        direction: dir
       });
       
+      tradeHistory.sort((a,b) => {
+        let timeA = a.dateStr ? new Date(a.dateStr).getTime() : parseInt(a.id);
+        let timeB = b.dateStr ? new Date(b.dateStr).getTime() : parseInt(b.id);
+        return timeB - timeA; 
+      });
+
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+      renderHistoryTable();
+      if(activeRecordsTab === 'report') renderReport();
+      
+      closeManualHistoryModal();
+      document.getElementById('manualHistoryForm').reset();
+      showToast('✅ 手動紀錄已加入', 'success');
+    });
+
+    // --- 編輯歷史紀錄邏輯 ---
+    window.openEditHistoryModal = function(id) {
+      const rec = tradeHistory.find(r => r.id === id);
+      if (!rec) return;
+
+      document.getElementById('ehId').value = rec.id;
+      document.getElementById('ehDate').value = rec.dateStr || new Date().toISOString().split('T')[0];
+      document.getElementById('ehSymbol').value = rec.ticker;
+      document.getElementById('ehQty').value = rec.quantity;
+      document.getElementById('ehBuy').value = rec.price;
+      document.getElementById('ehSell').value = rec.sellPrice !== undefined ? rec.sellPrice : '';
+      document.getElementById('ehFee').value = rec.fee !== undefined ? rec.fee : '';
+      
+      const isShort = rec.direction === 'short';
+      if(document.getElementById('ehDirShort')) document.getElementById('ehDirShort').checked = isShort;
+      if(document.getElementById('ehDirLong')) document.getElementById('ehDirLong').checked = !isShort;
+
+      document.getElementById('editHistoryModal').classList.remove('hidden');
+      document.getElementById('editHistoryModal').classList.add('flex');
+    };
+
+    window.closeEditHistoryModal = function() {
+      document.getElementById('editHistoryModal').classList.add('hidden');
+      document.getElementById('editHistoryModal').classList.remove('flex');
+    };
+
+    document.getElementById('editHistoryForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('ehId').value;
+      const rec = tradeHistory.find(r => r.id === id);
+      if (!rec) return;
+
+      rec.dateStr = document.getElementById('ehDate').value;
+      const dateObj = new Date(rec.dateStr);
+      rec.time = dateObj.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
+      rec.ticker = document.getElementById('ehSymbol').value.toUpperCase().trim();
+      rec.quantity = parseFloat(document.getElementById('ehQty').value);
+      rec.price = parseFloat(document.getElementById('ehBuy').value);
+      
+      const sellVal = document.getElementById('ehSell').value;
+      rec.sellPrice = sellVal ? parseFloat(sellVal) : undefined;
+      
+      const feeVal = document.getElementById('ehFee').value;
+      rec.fee = feeVal ? parseFloat(feeVal) : 0;
+      
+      const dirRadio = document.querySelector('input[name="ehDirection"]:checked');
+      rec.direction = dirRadio ? dirRadio.value : 'long';
+
       tradeHistory.sort((a,b) => {
         let timeA = a.dateStr ? new Date(a.dateStr).getTime() : parseInt(a.id);
         let timeB = b.dateStr ? new Date(b.dateStr).getTime() : parseInt(b.id);
@@ -1170,7 +1271,8 @@
         if (recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month) {
           const dateNum = recordDate.getDate();
           const fee = parseFloat(r.fee) || 0;
-          const pnl = (sPrice - r.price) * r.quantity - fee;
+          const isShort = r.direction === 'short';
+          const pnl = isShort ? (r.price - sPrice) * r.quantity - fee : (sPrice - r.price) * r.quantity - fee;
           dailyProfit[dateNum] = (dailyProfit[dateNum] || 0) + pnl;
           monthlyTotal += pnl;
         }
@@ -1440,36 +1542,51 @@
       if (activeTargetMode === 'price' && els.targetPriceInput) {
         const val = parseFloat(els.targetPriceInput.value);
         if (!isNaN(val)) {
-          const p = (val - averagePrice) * totalShares, pct = ((val - averagePrice) / averagePrice) * 100;
+          let p = 0;
+          records.forEach(r => {
+             p += (r.direction === 'short') ? (r.price - val) * r.quantity : (val - r.price) * r.quantity;
+          });
+          const pct = (p / totalCost) * 100;
           const color = p >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
-          html = `<div class="p-3 rounded-xl bg-[#2a2a2a] border border-[#444]"><div class="flex justify-between items-center mb-1"><span class="text-slate-200 font-medium">預估損益</span><span class="font-bold text-sm ${color}">${p >= 0 ? '+' : ''}${formatNumber(p)}</span></div><div class="flex justify-between items-center"><span class="text-slate-200 font-medium">報酬率</span><span class="font-bold text-sm ${color}">${pct >= 0 ? '+' : ''}${formatNumber(pct)}%</span></div></div>`;
+          html = `<div class="p-3 rounded-xl bg-[#2a2a2a] border border-[#444]"><div class="flex justify-between items-center mb-1"><span class="text-slate-200 font-medium">預估總損益</span><span class="font-bold text-sm ${color}">${p >= 0 ? '+' : ''}${formatNumber(p)}</span></div><div class="flex justify-between items-center"><span class="text-slate-200 font-medium">總報酬率</span><span class="font-bold text-sm ${color}">${pct >= 0 ? '+' : ''}${formatNumber(pct)}%</span></div></div>`;
         }
       } else if (activeTargetMode === 'percent' && els.percentInput) {
         let val = Math.abs(parseFloat(els.percentInput.value));
         if (!isNaN(val)) {
           const upP = averagePrice * (1 + val/100), dwP = averagePrice * (1 - val/100);
-          const upPn = (upP - averagePrice) * totalShares, dwPn = (dwP - averagePrice) * totalShares;
+          let upPn = 0, dwPn = 0;
+          records.forEach(r => {
+             upPn += (r.direction === 'short') ? (r.price - upP) * r.quantity : (upP - r.price) * r.quantity;
+             dwPn += (r.direction === 'short') ? (r.price - dwP) * r.quantity : (dwP - r.price) * r.quantity;
+          });
           html = `
             <div class="p-2.5 rounded-xl bg-[#00e676]/10 border border-[#00e676]/30 text-[11px]">
-              <div class="flex justify-between"><span class="text-slate-200 font-medium">上漲 ${val}%</span><span class="font-bold text-sm text-[#00e676]">${formatNumber(upP, 4)}</span></div>
-              <div class="mt-1 flex justify-between opacity-90 text-slate-300"><span class="font-medium">預估損益</span><span class="font-bold text-[#00e676]">+${formatNumber(upPn)}</span></div>
+              <div class="flex justify-between"><span class="text-slate-200 font-medium">現價上漲 ${val}%</span><span class="font-bold text-sm text-[#00e676]">${formatNumber(upP, 4)}</span></div>
+              <div class="mt-1 flex justify-between opacity-90 text-slate-300"><span class="font-medium">預估總損益</span><span class="font-bold ${upPn >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}">${upPn >= 0 ? '+' : ''}${formatNumber(upPn)}</span></div>
             </div>
             <div class="p-2.5 rounded-xl bg-[#ff5252]/10 border border-[#ff5252]/30 text-[11px] mt-2">
-              <div class="flex justify-between"><span class="text-slate-200 font-medium">下跌 ${val}%</span><span class="font-bold text-sm text-[#ff5252]">${formatNumber(dwP, 4)}</span></div>
-              <div class="mt-1 flex justify-between opacity-90 text-slate-300"><span class="font-medium">預估損益</span><span class="font-bold text-[#ff5252]">${formatNumber(dwPn)}</span></div>
+              <div class="flex justify-between"><span class="text-slate-200 font-medium">現價下跌 ${val}%</span><span class="font-bold text-sm text-[#ff5252]">${formatNumber(dwP, 4)}</span></div>
+              <div class="mt-1 flex justify-between opacity-90 text-slate-300"><span class="font-medium">預估總損益</span><span class="font-bold ${dwPn >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}">${dwPn >= 0 ? '+' : ''}${formatNumber(dwPn)}</span></div>
             </div>`;
         }
       } else if (activeTargetMode === 'pnl' && els.expectedPnlInput) {
         let val = Math.abs(parseFloat(els.expectedPnlInput.value));
         if (!isNaN(val)) {
-          const upP = averagePrice + (val/totalShares), dwP = averagePrice - (val/totalShares);
-          html = `
-            <div class="p-2.5 rounded-xl bg-[#00e676]/10 border border-[#00e676]/30 text-[11px]">
-              <div class="flex justify-between"><span class="text-slate-200 font-medium">獲利 +${formatNumber(val)}</span><span class="font-bold text-sm text-[#00e676]">${formatNumber(upP, 4)}</span></div>
-            </div>
-            <div class="p-2.5 rounded-xl bg-[#ff5252]/10 border border-[#ff5252]/30 text-[11px] mt-2">
-              <div class="flex justify-between"><span class="text-slate-200 font-medium">虧損 -${formatNumber(val)}</span><span class="font-bold text-sm text-[#ff5252]">${formatNumber(dwP, 4)}</span></div>
-            </div>`;
+          const netQty = records.reduce((acc, r) => acc + (r.direction === 'short' ? -r.quantity : r.quantity), 0);
+          if (netQty === 0) {
+             html = `<div class="p-2.5 rounded-xl bg-slate-800 text-center text-xs text-slate-400">多空已完全對沖，價位變動不影響總損益</div>`;
+          } else {
+             const valPerShare = val / Math.abs(netQty);
+             const upP = averagePrice + valPerShare;
+             const dwP = averagePrice - valPerShare;
+             html = `
+               <div class="p-2.5 rounded-xl bg-[#00e676]/10 border border-[#00e676]/30 text-[11px]">
+                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標獲利 +${formatNumber(val)}</span><span class="font-bold text-sm text-[#00e676]">${formatNumber(netQty > 0 ? upP : dwP, 4)}</span></div>
+               </div>
+               <div class="p-2.5 rounded-xl bg-[#ff5252]/10 border border-[#ff5252]/30 text-[11px] mt-2">
+                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標虧損 -${formatNumber(val)}</span><span class="font-bold text-sm text-[#ff5252]">${formatNumber(netQty > 0 ? dwP : upP, 4)}</span></div>
+               </div>`;
+          }
         }
       }
       els.pnlResult.innerHTML = html;
@@ -1503,9 +1620,13 @@
       const c = (averagePrice > 0 && v > averagePrice) ? '#00e676' : (averagePrice > 0 && v < averagePrice) ? '#ff5252' : '#fff';
       els.currentPriceDisp.style.color = c;
       if (totalShares > 0) {
-        const p = (v * totalShares) - totalCost, color = p >= 0 ? '#00e676' : '#ff5252';
-        if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (p > 0 ? '+' : '') + formatNumber(p); }
-        if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (p > 0 ? '+' : '') + formatNumber((p/totalCost)*100) + '%'; }
+        let totalPnl = 0;
+        records.forEach(r => {
+           totalPnl += (r.direction === 'short') ? (r.price - v) * r.quantity : (v - r.price) * r.quantity;
+        });
+        const color = totalPnl >= 0 ? '#00e676' : '#ff5252';
+        if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber(totalPnl); }
+        if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/totalCost)*100) + '%'; }
       }
       renderTable(); 
     }
@@ -1518,15 +1639,18 @@
         const p = parseFloat(els.priceInput.value), q = parseFloat(els.qtyInput.value), s = els.tickerInput.value.toUpperCase().trim() || '-';
         if (isNaN(p) || p <= 0 || isNaN(q) || q <= 0) return;
         
+        const dirRadio = document.querySelector('input[name="tradeDirection"]:checked');
+        const dir = dirRadio ? dirRadio.value : 'long';
+
         const now = new Date();
         const timeStr = now.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'}) + ' ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         
-        records.push({ id: Date.now().toString(), ticker: s, price: p, quantity: q, cost: p * q });
+        records.push({ id: Date.now().toString(), ticker: s, price: p, quantity: q, cost: p * q, direction: dir });
         tradeHistory.unshift({ 
           id: Date.now().toString()+'h', 
           time: timeStr, 
           dateStr: now.toISOString().split('T')[0], 
-          ticker: s, price: p, quantity: q 
+          ticker: s, price: p, quantity: q, direction: dir 
         });
         
         if (tradeHistory.length > 200) tradeHistory.pop();
@@ -1574,10 +1698,12 @@
       
       els.recordsTableBody.innerHTML = records.map(r => {
         let pnlHtml = '<td class="px-6 py-3 text-slate-500">-</td>';
+        const isShort = r.direction === 'short';
+        const dirHtml = isShort ? '<span class="text-[#ff5252] bg-[#ff5252]/10 px-1 py-0.5 rounded text-[9px] ml-1">空</span>' : '<span class="text-[#00e676] bg-[#00e676]/10 px-1 py-0.5 rounded text-[9px] ml-1">多</span>';
         
         if (!isNaN(currentPrice)) {
-          const rowPnl = (currentPrice - r.price) * r.quantity;
-          const rowPnlPct = ((currentPrice - r.price) / r.price) * 100;
+          const rowPnl = isShort ? (r.price - currentPrice) * r.quantity : (currentPrice - r.price) * r.quantity;
+          const rowPnlPct = isShort ? ((r.price - currentPrice) / r.price) * 100 : ((currentPrice - r.price) / r.price) * 100;
           const color = rowPnl >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
           const sign = rowPnl > 0 ? '+' : '';
           pnlHtml = `<td class="px-6 py-3 font-bold ${color}">${sign}${formatNumber(rowPnl)} <span class="text-[10px] opacity-70 ml-1">(${sign}${formatNumber(rowPnlPct)}%)</span></td>`;
@@ -1585,7 +1711,7 @@
 
         return `
         <tr class="hover:bg-white/[0.03] transition-colors">
-          <td class="px-6 py-3 font-bold text-[#2979ff] cursor-pointer" onclick="selectTicker('${r.ticker}')">${r.ticker}</td>
+          <td class="px-6 py-3 font-bold text-[#2979ff] cursor-pointer" onclick="selectTicker('${r.ticker}')">${r.ticker}${dirHtml}</td>
           <td class="px-6 py-3">${formatNumber(r.quantity)}</td>
           <td class="px-6 py-3 text-slate-300">$${formatNumber(r.price, 4)}</td>
           <td class="px-6 py-3 text-slate-400">$${formatNumber(r.cost)}</td>
@@ -1630,10 +1756,12 @@
 
           let pnlHtml = '<span class="text-slate-600">-</span>';
           const sPrice = parseFloat(r.sellPrice);
+          const isShort = r.direction === 'short';
+          const dirHtml = isShort ? '<span class="text-[#ff5252] bg-[#ff5252]/10 px-1 py-0.5 rounded text-[9px] ml-1">空</span>' : '<span class="text-[#00e676] bg-[#00e676]/10 px-1 py-0.5 rounded text-[9px] ml-1">多</span>';
           
           if (!isNaN(sPrice)) {
             const fee = parseFloat(r.fee) || 0;
-            const pnl = (sPrice - r.price) * r.quantity - fee;
+            const pnl = isShort ? (r.price - sPrice) * r.quantity - fee : (sPrice - r.price) * r.quantity - fee;
             const pnlPct = (pnl / (r.price * r.quantity)) * 100;
             const color = pnl >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
             const sign = pnl > 0 ? '+' : '';
@@ -1643,11 +1771,11 @@
           htmlStr += `
           <tr class="hover:bg-white/[0.03] transition-colors">
             <td class="px-4 py-3 text-slate-600 font-mono whitespace-nowrap">${r.time}</td>
-            <td class="px-4 py-3 font-bold text-[#2979ff] cursor-pointer whitespace-nowrap" onclick="selectTicker('${r.ticker}')">${r.ticker}</td>
+            <td class="px-4 py-3 font-bold text-[#2979ff] cursor-pointer whitespace-nowrap" onclick="selectTicker('${r.ticker}')">${r.ticker}${dirHtml}</td>
             <td class="px-4 py-3 whitespace-nowrap">${formatNumber(r.quantity)}</td>
             <td class="px-4 py-3 text-slate-300 whitespace-nowrap">$${formatNumber(r.price, 4)}</td>
             <td class="px-2 py-2 text-center">
-              <input type="number" step="any" placeholder="-" value="${r.sellPrice !== undefined ? r.sellPrice : ''}" onchange="updateHistoryTrade('${r.id}', 'sellPrice', this.value)" class="w-16 px-1.5 py-1 text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入賣出價">
+              <input type="number" step="any" placeholder="-" value="${r.sellPrice !== undefined ? r.sellPrice : ''}" onchange="updateHistoryTrade('${r.id}', 'sellPrice', this.value)" class="w-16 px-1.5 py-1 text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入平倉價">
             </td>
             <td class="px-2 py-2 text-center">
               <input type="number" step="any" placeholder="-" value="${r.fee !== undefined ? r.fee : ''}" onchange="updateHistoryTrade('${r.id}', 'fee', this.value)" class="w-14 px-1.5 py-1 text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入手續費">
