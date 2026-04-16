@@ -513,6 +513,10 @@
                 <div class="text-[11px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">月累計收益 (<span id="reportCurrencyLabel">USD</span>)</div>
                 <div id="reportMonthTotal" class="text-3xl font-bold text-[#00e676]">+0.00</div>
               </div>
+              <div class="text-right">
+                <div class="text-[11px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">年累計收益 (<span id="reportYearCurrencyLabel">USD</span>)</div>
+                <div id="reportYearTotal" class="text-xl md:text-2xl font-bold text-[#00e676]">+0.00</div>
+              </div>
             </div>
           </div>
 
@@ -634,8 +638,10 @@
       reportMonthPicker: document.getElementById('reportMonthPicker'),
       reportCurrencySelect: document.getElementById('reportCurrencySelect'),
       reportCurrencyLabel: document.getElementById('reportCurrencyLabel'),
+      reportYearCurrencyLabel: document.getElementById('reportYearCurrencyLabel'),
       reportCalendarGrid: document.getElementById('reportCalendarGrid'),
-      reportMonthTotal: document.getElementById('reportMonthTotal')
+      reportMonthTotal: document.getElementById('reportMonthTotal'),
+      reportYearTotal: document.getElementById('reportYearTotal')
     };
 
     // --- UI 工具 (浮動通知與自訂對話框) ---
@@ -1253,12 +1259,14 @@
       const currency = els.reportCurrencySelect ? els.reportCurrencySelect.value : 'USD';
       const multiplier = currency === 'MOP' ? 8 : 1; 
       if (els.reportCurrencyLabel) els.reportCurrencyLabel.textContent = currency;
+      if (els.reportYearCurrencyLabel) els.reportYearCurrencyLabel.textContent = currency;
 
       const daysInMonth = new Date(year, month, 0).getDate();
       const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
 
       const dailyProfit = {};
       let monthlyTotal = 0;
+      let yearlyTotal = 0;
 
       tradeHistory.forEach(r => {
         const sPrice = parseFloat(r.sellPrice);
@@ -1272,13 +1280,18 @@
           recordDate = ts ? new Date(ts) : new Date();
         }
 
-        if (recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month) {
-          const dateNum = recordDate.getDate();
+        if (recordDate.getFullYear() === year) {
           const fee = parseFloat(r.fee) || 0;
           const isShort = r.direction === 'short';
           const pnl = isShort ? (r.price - sPrice) * r.quantity - fee : (sPrice - r.price) * r.quantity - fee;
-          dailyProfit[dateNum] = (dailyProfit[dateNum] || 0) + pnl;
-          monthlyTotal += pnl;
+          
+          yearlyTotal += pnl;
+
+          if (recordDate.getMonth() + 1 === month) {
+            const dateNum = recordDate.getDate();
+            dailyProfit[dateNum] = (dailyProfit[dateNum] || 0) + pnl;
+            monthlyTotal += pnl;
+          }
         }
       });
 
@@ -1329,6 +1342,12 @@
       const displayTotal = monthlyTotal * multiplier; 
       els.reportMonthTotal.textContent = (displayTotal > 0 ? '+' : '') + formatNumber(displayTotal);
       els.reportMonthTotal.className = `text-3xl font-bold tracking-tight ${displayTotal >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`;
+
+      const displayYearTotal = yearlyTotal * multiplier;
+      if (els.reportYearTotal) {
+        els.reportYearTotal.textContent = (displayYearTotal > 0 ? '+' : '') + formatNumber(displayYearTotal);
+        els.reportYearTotal.className = `text-xl md:text-2xl font-bold tracking-tight ${displayYearTotal >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`;
+      }
     }
 
     if(els.reportMonthPicker) {
