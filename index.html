@@ -239,8 +239,11 @@
         
         <!-- API 抓價 -->
         <div class="card-panel p-3 rounded-xl">
-          <div class="flex justify-between items-center mb-2">
-            <h2 class="text-sm font-bold uppercase tracking-wider text-white">市場報價</h2>
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex flex-col">
+              <h2 class="text-sm font-bold uppercase tracking-wider text-white">市場報價</h2>
+              <span id="lastUpdateTime" class="text-[9px] text-slate-500 font-mono mt-0.5"></span>
+            </div>
             <div class="flex items-center space-x-1.5">
               <select id="dataSourceSelect" class="bg-[#2a2a2a] text-[10px] text-white border border-[#444] rounded px-1 py-0.5 outline-none font-bold cursor-pointer focus:border-[#2979ff]">
                 <option value="finnhub">來源: Finnhub</option>
@@ -616,6 +619,7 @@
       fetchBtn: document.getElementById('fetchBtn'),
       autoRefreshCheckbox: document.getElementById('autoRefreshCheckbox'),
       refreshIntervalInput: document.getElementById('refreshIntervalInput'),
+      lastUpdateTime: document.getElementById('lastUpdateTime'),
       qtyInput: document.getElementById('qtyInput'),
       priceInput: document.getElementById('priceInput'),
       addForm: document.getElementById('addForm'),
@@ -1563,6 +1567,14 @@
       });
     }
 
+    function updateLastFetchTime() {
+      if (!els.lastUpdateTime) return;
+      const now = new Date();
+      // 強制轉換並格式化為澳門時間 (Asia/Macau)
+      const timeStr = now.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Macau', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      els.lastUpdateTime.textContent = `澳門時間 ${timeStr}`;
+    }
+
     async function fetchStockData() {
       if(!els.tickerInput) return;
       const symbol = els.tickerInput.value.toUpperCase().trim();
@@ -1584,6 +1596,7 @@
           if (data && data.c) { 
             if(els.currentPriceDisp) els.currentPriceDisp.value = data.c; 
             updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c); saveData(); 
+            updateLastFetchTime();
           }
         } else {
           // Twelve Data API 邏輯
@@ -1596,6 +1609,7 @@
             const price = parseFloat(data.price);
             if(els.currentPriceDisp) els.currentPriceDisp.value = price;
             updateCurrentPriceColor(); checkPriceAlerts(symbol, price); saveData();
+            updateLastFetchTime();
           } else {
              showToast('無法取得該代號之全市場報價', 'error');
           }
@@ -1622,8 +1636,11 @@
             showToast('自動刷新暫停 (達 Finnhub API 限制)', 'error'); return;
           }
           const data = await res.json();
-          if (data && data.c && els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== data.c) { 
-            els.currentPriceDisp.value = data.c; updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c);
+          if (data && data.c) { 
+            if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== data.c) {
+              els.currentPriceDisp.value = data.c; updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c);
+            }
+            updateLastFetchTime();
           }
         } else {
            const res = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${TWELVE_DATA_API_KEY}`);
@@ -1638,6 +1655,7 @@
               if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== price) {
                 els.currentPriceDisp.value = price; updateCurrentPriceColor(); checkPriceAlerts(symbol, price);
               }
+              updateLastFetchTime();
            }
         }
       } catch (err) {}
@@ -1877,7 +1895,9 @@
         let pnlHtml = '<td class="px-6 py-3 text-slate-500">-</td>';
         const isShort = r.direction === 'short';
         const dirHtml = isShort ? '<span class="text-[#ff5252] bg-[#ff5252]/10 px-1 py-0.5 rounded text-[9px] ml-1">空</span>' : '<span class="text-[#00e676] bg-[#00e676]/10 px-1 py-0.5 rounded text-[9px] ml-1">多</span>';
-        const newBadge = index === 0 ? '<span class="ml-2 text-white bg-rose-600 px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider animate-pulse shadow-[0_0_8px_rgba(225,29,72,0.6)]">NEW</span>' : '';
+        
+        // 取消紅方框，改用純文字+光暈呼吸燈特效
+        const newBadge = index === 0 ? '<span class="ml-2 text-[#ff5252] text-[9px] font-black italic tracking-wider animate-pulse drop-shadow-[0_0_5px_rgba(255,82,82,0.8)]">NEW</span>' : '';
         
         if (!isNaN(currentPrice)) {
           const rowPnl = (currentPrice - r.price) * r.quantity;
@@ -1919,7 +1939,7 @@
         let currentMonthStr = '';
         let htmlStr = '';
 
-        filteredHistory.forEach(r => {
+        filteredHistory.forEach((r, index) => {
           // 解析這筆紀錄的月份
           let recordDate;
           if (r.dateStr) {
@@ -1945,6 +1965,9 @@
           const isShort = r.direction === 'short';
           const dirHtml = isShort ? '<span class="text-[#ff5252] bg-[#ff5252]/10 px-1 py-0.5 rounded text-[9px] ml-1">空</span>' : '<span class="text-[#00e676] bg-[#00e676]/10 px-1 py-0.5 rounded text-[9px] ml-1">多</span>';
           
+          // 為歷史紀錄的第一筆也加上無框光暈 NEW
+          const newBadge = index === 0 ? '<span class="ml-2 text-[#ff5252] text-[9px] font-black italic tracking-wider animate-pulse drop-shadow-[0_0_5px_rgba(255,82,82,0.8)]">NEW</span>' : '';
+          
           if (!isNaN(sPrice)) {
             const fee = parseFloat(r.fee) || 0;
             const pnl = (sPrice - r.price) * r.quantity - fee;
@@ -1957,7 +1980,11 @@
           htmlStr += `
           <tr class="hover:bg-white/[0.03] transition-colors">
             <td class="px-4 py-3 text-slate-600 font-mono whitespace-nowrap">${r.time}</td>
-            <td class="px-4 py-3 font-bold text-[#2979ff] cursor-pointer whitespace-nowrap" onclick="selectTicker('${r.ticker}')">${r.ticker}${dirHtml}</td>
+            <td class="px-4 py-3 font-bold text-[#2979ff] cursor-pointer whitespace-nowrap" onclick="selectTicker('${r.ticker}')">
+              <div class="flex items-center">
+                ${r.ticker}${dirHtml}${newBadge}
+              </div>
+            </td>
             <td class="px-4 py-3 whitespace-nowrap">${formatNumber(r.quantity)}</td>
             <td class="px-4 py-3 text-slate-300 whitespace-nowrap">$${formatNumber(r.price, 4)}</td>
             <td class="px-2 py-2 text-center">
