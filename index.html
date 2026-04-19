@@ -104,29 +104,6 @@
     </div>
   </div>
 
-  <!-- 多裝置同步 Modal -->
-  <div id="syncModal" class="fixed inset-0 z-[999] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
-    <div class="bg-[#1e1e1e] border border-[#333] p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4">
-      <h3 class="text-white font-bold mb-4 text-lg">🔗 跨裝置同步設定</h3>
-      <p class="text-[11px] text-slate-400 mb-4">輸入其他裝置的「雲端同步碼」即可無縫連結資料，實現電腦與手機即時連動。</p>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-[11px] font-bold text-[#00e676] mb-1">本機專屬同步碼</label>
-          <input id="mySyncCode" type="text" readonly class="w-full px-3 py-2 text-xl font-mono font-bold tracking-widest text-center rounded-lg bg-[#2a2a2a] border border-[#444] text-[#00e676] outline-none shadow-inner select-all">
-          <p class="text-[9px] text-slate-500 mt-1 text-center">💡 用手機打開網頁後，輸入上方這組代碼</p>
-        </div>
-        <div class="pt-3 border-t border-[#333]">
-          <label class="block text-[11px] font-bold text-[#2979ff] mb-1">連接到其他裝置</label>
-          <input id="targetSyncCode" type="text" placeholder="輸入 6 碼英數" class="w-full px-3 py-2 text-xl font-mono font-bold tracking-widest text-center uppercase rounded-lg bg-[#2a2a2a] border border-[#444] text-white focus:border-[#2979ff] outline-none transition-colors">
-        </div>
-      </div>
-      <div class="flex justify-end space-x-3 mt-6">
-        <button id="syncModalCancel" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-[#333] transition-colors">取消</button>
-        <button id="syncModalSave" class="px-4 py-2 rounded-lg text-sm font-bold bg-[#2979ff] hover:bg-[#1c54b2] text-white transition-colors shadow-lg">連接</button>
-      </div>
-    </div>
-  </div>
-
   <!-- 手動加入歷史紀錄 Modal -->
   <div id="manualHistoryModal" class="fixed inset-0 z-[999] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
     <div class="bg-[#1e1e1e] border border-[#333] p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4">
@@ -249,13 +226,10 @@
         </div>
       </div>
       <div class="flex items-center space-x-2">
-        <button id="syncCodeBtn" class="text-xs flex items-center bg-[#2979ff]/10 hover:bg-[#2979ff]/20 text-[#2979ff] px-3 py-2 rounded-lg transition-colors border border-[#2979ff]/30 shadow-sm font-bold" title="設定跨裝置同步">
-          🔗 跨裝置同步
-        </button>
         <button id="exportBtn" class="text-xs flex items-center bg-[#2a2a2a] hover:bg-[#333] text-slate-300 px-3 py-2 rounded-lg transition-colors border border-[#444] shadow-sm hidden md:flex" title="將所有紀錄與設定打包導出 (JSON)">
           📤 導出
         </button>
-        <label class="text-xs flex items-center bg-[#2a2a2a] hover:bg-[#333] text-slate-300 px-3 py-2 rounded-lg transition-colors border border-[#444] shadow-sm cursor-pointer mb-0" title="導入備份還原資料 (JSON)">
+        <label class="text-xs flex items-center bg-[#2a2a2a] hover:bg-[#333] text-slate-300 px-3 py-2 rounded-lg transition-colors border border-[#444] shadow-sm cursor-pointer mb-0 hidden md:flex" title="導入備份還原資料 (JSON)">
           📥 導入
           <input type="file" id="importFileInput" accept=".json" class="hidden">
         </label>
@@ -628,9 +602,9 @@
     }
 
     let currentUser = null;
-    let isSyncingFromCloud = false;
+    let isApplyingCloudData = false; // 替換舊的計時器鎖定，改用絕對同步鎖
     let saveTimeout = null;
-    let hasInitialLoaded = false; // 新增：用來追蹤是否為第一次收到雲端資料
+    let unsubscribeSnapshot = null;
 
     const syncStatusEl = document.getElementById('cloudSyncStatus');
     function updateSyncStatus(status) {
@@ -676,30 +650,25 @@
 
     function setupFirebaseListener(syncCode) {
        updateSyncStatus('syncing');
-       // 路徑改為符合系統嚴格規範的 public/data
+       if (unsubscribeSnapshot) unsubscribeSnapshot();
+
        const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'sync_state', syncCode);
-       onSnapshot(docRef, (docSnap) => {
+       unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
            if (docSnap.exists()) {
-               if (!isSyncingFromCloud) {
-                   isSyncingFromCloud = true; // 鎖定本地同步，防止無限循環
+               isApplyingCloudData = true; // 開啟嚴格同步鎖，阻擋攔截器
+               try {
                    const data = docSnap.data();
                    
-                   if (data.records) records = data.records;
-                   if (data.tradeHistory) tradeHistory = data.tradeHistory;
-                   if (data.savedTickers) savedTickers = data.savedTickers;
-                   if (data.priceAlerts) priceAlerts = data.priceAlerts;
+                   records = data.records || [];
+                   tradeHistory = data.tradeHistory || [];
+                   savedTickers = data.savedTickers || [];
+                   priceAlerts = data.priceAlerts || [];
                    
-                   if (data.settings) {
-                       if(els.tickerInput && data.settings.ticker) els.tickerInput.value = data.settings.ticker;
-                   }
-                   
-                   // 寫入本地暫存以保持一致性 (因為鎖定為 true，此操作不會再推回雲端)
                    window.localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
                    window.localStorage.setItem(STORAGE_KEY_TICKERS, JSON.stringify(savedTickers));
                    window.localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
                    window.localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({records, ticker: els.tickerInput ? els.tickerInput.value : ''}));
                    
-                   // 觸發所有畫面的重繪
                    calculateCore();
                    renderHistoryTable();
                    if(activeRecordsTab === 'report') renderReport();
@@ -708,17 +677,10 @@
                    renderTickerDropdown();
                    
                    updateSyncStatus('synced');
-                   
-                   // 💡 新增：當手機成功接到電腦資料時，給予明確的成功提示
-                   if (!hasInitialLoaded) {
-                       showToast('✅ 跨裝置連線成功！資料已同步', 'success');
-                       hasInitialLoaded = true;
-                   }
-
-                   setTimeout(() => { isSyncingFromCloud = false; }, 800); // 釋放鎖定
+               } finally {
+                   isApplyingCloudData = false; // 畫面更新完畢，立即解鎖，零延遲
                }
            } else {
-               // 💡 修復卡在同步中：如果是初次使用的新帳號（雲端還是空的），直接顯示連線成功
                updateSyncStatus('synced');
            }
        }, (err) => {
@@ -731,11 +693,10 @@
        });
     }
 
-    // 加入 forcePush 參數，允許強制立即上傳
     window.syncToCloud = function(forcePush = false) {
-       if (!currentUser || isSyncingFromCloud) return;
-       updateSyncStatus('syncing');
+       if (!currentUser || isApplyingCloudData) return; // 正在套用雲端資料時，絕對不可反向覆寫
        
+       updateSyncStatus('syncing');
        if (saveTimeout) clearTimeout(saveTimeout);
        
        const executeUpload = async () => {
@@ -746,10 +707,8 @@
                    records,
                    tradeHistory,
                    savedTickers,
-                   priceAlerts,
-                   settings: {
-                       ticker: els.tickerInput ? els.tickerInput.value : ''
-                   }
+                   priceAlerts
+                   // 💡 移除了 settings，讓各裝置保有完全獨立的 UI 狀態 (不搶看同一檔股票)
                };
                await setDoc(docRef, stateToSave, { merge: true });
                updateSyncStatus('synced');
@@ -763,7 +722,7 @@
        };
 
        if (forcePush) {
-           executeUpload(); // 強制立即上傳 (無延遲)
+           executeUpload(); // 強制立即上傳
        } else {
            saveTimeout = setTimeout(executeUpload, 1500); // 一般操作時防抖打包
        }
@@ -773,8 +732,8 @@
     const originalSetItem = window.localStorage.setItem;
     window.localStorage.setItem = function(key, value) {
         originalSetItem.apply(window.localStorage, arguments);
-        // 若偵測到核心資料有變動，自動觸發雲端儲存
-        if ([STORAGE_KEY_STATE, STORAGE_KEY_HISTORY, STORAGE_KEY_TICKERS, STORAGE_KEY_ALERTS].includes(key)) {
+        // 只有在非「雲端資料覆寫」狀態下修改資料，才會觸發上傳
+        if (!isApplyingCloudData && [STORAGE_KEY_STATE, STORAGE_KEY_HISTORY, STORAGE_KEY_TICKERS, STORAGE_KEY_ALERTS].includes(key)) {
             if (typeof window.syncToCloud === 'function') window.syncToCloud();
         }
     };
@@ -827,14 +786,6 @@
       twelveDataKeyInput: document.getElementById('twelveDataKeyInput'),
       apiModalCancel: document.getElementById('apiModalCancel'),
       apiModalSave: document.getElementById('apiModalSave'),
-
-      // Sync Modal
-      syncCodeBtn: document.getElementById('syncCodeBtn'),
-      syncModal: document.getElementById('syncModal'),
-      mySyncCode: document.getElementById('mySyncCode'),
-      targetSyncCode: document.getElementById('targetSyncCode'),
-      syncModalCancel: document.getElementById('syncModalCancel'),
-      syncModalSave: document.getElementById('syncModalSave'),
 
       // Settings & Inputs
       exportBtn: document.getElementById('exportBtn'),
@@ -999,43 +950,6 @@
         els.apiSettingsModal.classList.add('hidden');
         els.apiSettingsModal.classList.remove('flex');
         showToast('✅ API Keys 已儲存更新', 'success');
-      });
-    }
-
-    // --- 同步碼設定 Modal 邏輯 ---
-    if(els.syncCodeBtn) {
-      els.syncCodeBtn.addEventListener('click', () => {
-        els.mySyncCode.value = currentSyncCode;
-        els.targetSyncCode.value = '';
-        els.syncModal.classList.remove('hidden');
-        els.syncModal.classList.add('flex');
-        
-        // 💡 關鍵修復：當電腦打開這個面板時，強制將現有資料推上雲端，確保手機有東西可以抓！
-        if (typeof window.syncToCloud === 'function') {
-            window.syncToCloud(true);
-        }
-      });
-    }
-
-    if(els.syncModalCancel) {
-      els.syncModalCancel.addEventListener('click', () => {
-        els.syncModal.classList.add('hidden');
-        els.syncModal.classList.remove('flex');
-      });
-    }
-
-    if(els.syncModalSave) {
-      els.syncModalSave.addEventListener('click', () => {
-        const newCode = els.targetSyncCode.value.toUpperCase().trim();
-        if(newCode.length < 4) return showToast('請輸入有效的同步碼', 'error');
-        
-        localStorage.setItem(STORAGE_KEY_SYNC_CODE, newCode);
-        els.syncModal.classList.add('hidden');
-        els.syncModal.classList.remove('flex');
-        
-        showToast('🔄 同步碼已切換，正在連線載入資料...', 'success');
-        // 延遲重整以確保讀取新的雲端路徑
-        setTimeout(() => window.location.reload(), 1000);
       });
     }
 
