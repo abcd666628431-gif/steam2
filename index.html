@@ -620,7 +620,14 @@
           await signInAnonymously(auth);
         }
       } catch (error) {
-        try { await signInAnonymously(auth); } catch(e) { updateSyncStatus('error'); }
+        console.error("Auth Initial Error:", error);
+        try { 
+          await signInAnonymously(auth); 
+        } catch(e) { 
+          console.error("Auth Fallback Error:", e);
+          updateSyncStatus('error'); 
+          showToast('連線失敗：請至 Firebase 啟用「匿名登入 (Anonymous)」', 'error');
+        }
       }
     };
     initAuth();
@@ -636,14 +643,14 @@
        updateSyncStatus('syncing');
        const docRef = doc(db, 'artifacts', appIdStr, 'users', uid, 'calculatorData', 'state');
        onSnapshot(docRef, (docSnap) => {
-           if (docSnap.exists() && !isSyncingFromCloud) {
-               isSyncingFromCloud = true; // 鎖定本地同步，防止無限循環
-               const data = docSnap.data();
-               
-               if (data.records) records = data.records;
-               if (data.tradeHistory) tradeHistory = data.tradeHistory;
-               if (data.savedTickers) savedTickers = data.savedTickers;
-               if (data.priceAlerts) priceAlerts = data.priceAlerts;
+           if (docSnap.exists()) {
+               if (!isSyncingFromCloud) {
+                   isSyncingFromCloud = true; // 鎖定本地同步，防止無限循環
+                   const data = docSnap.data();
+                   
+                   if (data.records) records = data.records;
+                   if (data.tradeHistory) tradeHistory = data.tradeHistory;
+                   if (data.savedTickers) savedTickers = data.savedTickers;
                
                if (data.settings) {
                    if(els.tickerInput && data.settings.ticker) els.tickerInput.value = data.settings.ticker;
@@ -652,20 +659,20 @@
                
                // 寫入本地暫存以保持一致性 (因為鎖定為 true，此操作不會再推回雲端)
                window.localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
-               window.localStorage.setItem(STORAGE_KEY_TICKERS, JSON.stringify(savedTickers));
-               window.localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
-               window.localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({records, ticker: els.tickerInput ? els.tickerInput.value : ''}));
-               
-               // 觸發所有畫面的重繪
-               calculateCore();
-               renderHistoryTable();
-               if(activeRecordsTab === 'report') renderReport();
-               if(activeRecordsTab === 'details') renderDetails();
-               renderAlerts();
-               renderTickerDropdown();
-               
+                   // 觸發所有畫面的重繪
+                   calculateCore();
+                   renderHistoryTable();
+                   if(activeRecordsTab === 'report') renderReport();
+                   if(activeRecordsTab === 'details') renderDetails();
+                   renderAlerts();
+                   renderTickerDropdown();
+                   
+                   updateSyncStatus('synced');
+                   setTimeout(() => { isSyncingFromCloud = false; }, 800); // 釋放鎖定
+               }
+           } else {
+               // 💡 修復卡在同步中：如果是初次使用的新帳號（雲端還是空的），直接顯示連線成功
                updateSyncStatus('synced');
-               setTimeout(() => { isSyncingFromCloud = false; }, 800); // 釋放鎖定
            }
        }, (err) => {
            console.error("Firestore Listen Error:", err);
