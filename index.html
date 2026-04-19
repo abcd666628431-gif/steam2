@@ -455,7 +455,6 @@
               <button id="tabBtnDetails" onclick="switchRecordsTab('details')" class="text-[10px] md:text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 pb-1 transition-all whitespace-nowrap">盈虧明細</button>
             </div>
             <div class="flex space-x-2 md:space-x-3 shrink-0 ml-2">
-              <button id="clearBtn" class="hidden text-[9px] md:text-[10px] font-bold text-slate-500 hover:text-rose-500 transition-colors">RE-CALCULATE</button>
               <div id="historyActions" class="hidden flex items-center space-x-1.5 md:space-x-3">
                 <input type="text" id="historySearchInput" placeholder="🔍 搜尋" class="w-16 sm:w-24 md:w-32 bg-[#2a2a2a] border border-[#444] rounded px-1.5 md:px-2 py-1 text-[9px] md:text-[10px] outline-none focus:border-[#2979ff] text-white uppercase transition-all shadow-sm">
                 <button onclick="openManualHistoryModal()" class="text-[9px] md:text-[10px] font-bold text-[#2979ff] hover:text-white transition-colors border border-[#2979ff]/40 px-1.5 md:px-2 py-1 rounded shadow-sm whitespace-nowrap">➕ <span class="hidden sm:inline">手動加入</span></button>
@@ -858,7 +857,6 @@
       chartIntervalSelect: document.getElementById('chartIntervalSelect'),
       tvchartContainer: document.getElementById('tvchart'),
       recordsTableBody: document.getElementById('recordsTableBody'),
-      clearBtn: document.getElementById('clearBtn'),
       tabBtnCurrent: document.getElementById('tabBtnCurrent'),
       currentCount: document.getElementById('currentCount'),
       tabBtnHistory: document.getElementById('tabBtnHistory'),
@@ -1579,7 +1577,6 @@
       if(els.reportView) els.reportView.classList.toggle('hidden', tab !== 'report');
       if(els.detailsView) els.detailsView.classList.toggle('hidden', tab !== 'details');
       
-      if(els.clearBtn) els.clearBtn.classList.toggle('hidden', tab !== 'current' || records.length === 0);
       if(els.historyActions) els.historyActions.classList.toggle('hidden', tab !== 'history');
 
       if(tab === 'report') renderReport();
@@ -1634,7 +1631,7 @@
 
       let gridHtml = '';
       for (let i = 0; i < firstDayOfWeek; i++) {
-        gridHtml += `<div class="p-1 min-h-[75px]"></div>`;
+        gridHtml += `<div class="p-1 min-h-[50px] md:min-h-[75px]"></div>`;
       }
 
       const today = new Date();
@@ -1667,9 +1664,9 @@
         }
 
         gridHtml += `
-          <div class="flex flex-col items-center justify-center p-1 min-h-[75px] rounded ${bgClass}">
-            <span class="text-[15px] font-bold text-slate-200 ${profitStr ? 'mb-1' : ''}">${d}</span>
-            ${profitStr ? `<span class="text-[13px] font-bold ${textClass} break-all leading-tight">${profitStr}</span>` : ''}
+          <div class="flex flex-col items-center justify-center p-0.5 md:p-1 min-h-[50px] md:min-h-[75px] rounded ${bgClass} overflow-hidden">
+            <span class="text-[11px] md:text-[15px] font-bold text-slate-200 ${profitStr ? 'mb-0.5 md:mb-1' : ''}">${d}</span>
+            ${profitStr ? `<span class="text-[7.5px] sm:text-[9px] md:text-[13px] font-bold tracking-tighter whitespace-nowrap w-full text-center ${textClass} leading-none">${profitStr}</span>` : ''}
           </div>
         `;
       }
@@ -2167,12 +2164,6 @@
         if(activeRecordsTab === 'details') renderDetails();
       }
     };
-
-    if(els.clearBtn) {
-      els.clearBtn.addEventListener('click', () => { 
-        showModal({ type: 'confirm', text: '確定要清空當前所有倉位紀錄嗎？', onConfirm: () => { records = []; calculateCore(); showToast('紀錄已清空'); } });
-      });
-    }
 
     if(els.historySearchInput) {
       els.historySearchInput.addEventListener('input', renderHistoryTable);
