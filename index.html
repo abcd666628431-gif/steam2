@@ -604,15 +604,14 @@
     const syncStatusEl = document.getElementById('cloudSyncStatus');
     function updateSyncStatus(status) {
       if(!syncStatusEl) return;
-      const uidShort = currentUser ? `(#${currentUser.uid.slice(-4).toUpperCase()})` : '';
       if(status === 'syncing') {
-          syncStatusEl.innerHTML = `☁️ 同步中... ${uidShort}`;
+          syncStatusEl.innerHTML = `☁️ 同步中...`;
           syncStatusEl.className = 'text-[10px] text-amber-400 ml-3 animate-pulse';
       } else if (status === 'synced') {
-          syncStatusEl.innerHTML = `☁️ 即時同步 ${uidShort}`;
+          syncStatusEl.innerHTML = `☁️ 即時連線`;
           syncStatusEl.className = 'text-[10px] text-[#00e676] ml-3';
       } else if (status === 'error') {
-          syncStatusEl.innerHTML = `☁️ 離線模式 ${uidShort}`;
+          syncStatusEl.innerHTML = `☁️ 離線模式`;
           syncStatusEl.className = 'text-[10px] text-slate-500 ml-3';
       }
     }
@@ -640,16 +639,16 @@
     onAuthStateChanged(auth, (user) => {
       if (user) {
         currentUser = user;
-        setupFirebaseListener(user.uid); 
+        setupFirebaseListener(); // 💡 拔除 UID 綁定
       }
     });
 
-    function setupFirebaseListener(uid) {
+    function setupFirebaseListener() {
        updateSyncStatus('syncing');
        if (unsubscribeSnapshot) unsubscribeSnapshot();
 
-       // 採用最高安全規格的私有路徑 (users/uid)
-       const docRef = doc(db, 'artifacts', appIdStr, 'users', uid, 'calculatorData', 'state');
+       // 💡 核心突破：模仿行程助手，改用「公共空間 (public/data)」並綁定網址 AppID。完全打破不同裝置/無痕模式的隔閡！
+       const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'calculatorData', 'global_state');
        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
            if (docSnap.exists()) {
                const data = docSnap.data();
@@ -658,6 +657,8 @@
                if (data.updatedAt && data.updatedAt <= lastLocalSyncTime) {
                    return; 
                }
+               
+               lastLocalSyncTime = data.updatedAt || Date.now(); // 同步雲端時間戳
 
                // 這是來自其他裝置的「較新資料」，執行無縫替換
                records = data.records || [];
@@ -682,7 +683,7 @@
                
                updateSyncStatus('synced');
            } else {
-               // 💡 核心修復：如果雲端是空的，但電腦本地有舊資料，立刻強制將舊資料「推」上雲端！
+               // 💡 如果雲端是空的，但電腦本地有舊資料，立刻強制將舊資料「推」上雲端！
                if (records.length > 0 || tradeHistory.length > 0 || savedTickers.length > 0) {
                    console.log("偵測到本地舊資料，正在自動將舊資料備份至雲端...");
                    if (typeof window.syncToCloud === 'function') window.syncToCloud(true);
@@ -710,7 +711,8 @@
            try {
                lastLocalSyncTime = Date.now(); // 記錄本次手動更新的時間戳
                
-               const docRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'calculatorData', 'state');
+               // 💡 對應上方的網址綁定路徑
+               const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'calculatorData', 'global_state');
                const stateToSave = {
                    records,
                    tradeHistory,
@@ -741,7 +743,11 @@
     // --- 攔截 localStorage 自動觸發雲端同步 ---
     const originalSetItem = window.localStorage.setItem;
     window.localStorage.setItem = function(key, value) {
+        const oldValue = window.localStorage.getItem(key);
         originalSetItem.apply(window.localStorage, arguments);
+        
+        // 💡 阻擋不必要的重複上傳：只有資料真的有變才觸發，省流量且避免自己覆蓋自己
+        if (oldValue === value) return;
         
         // 如果是靜默寫入 (來自雲端下載的資料)，則不觸發上傳
         if (window.localStorage.getItem('stockCalcLocalUI_PRO_Silent') === 'true') return;
