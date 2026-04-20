@@ -593,13 +593,16 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app); 
+    const db = getFirestore(app); // 恢復使用最穩定的標準連線，不使用容易被手機阻擋的快取機制
     
     const appIdStr = typeof __app_id !== 'undefined' ? __app_id : 'stock-calculator-pro';
 
     let currentUser = null;
     let unsubscribeSnapshot = null;
-    let cloudSyncTimestamp = 0; // 雲端時間戳，用來防回音
+    
+    // --- 核心重製：時間戳回音消除機制 ---
+    let lastLocalSyncTime = 0; 
+    let syncDebounceTimer = null;
 
     const syncStatusEl = document.getElementById('cloudSyncStatus');
     function updateSyncStatus(status) {
@@ -639,7 +642,7 @@
     onAuthStateChanged(auth, (user) => {
       if (user) {
         currentUser = user;
-        setupFirebaseListener(); // 恢復綁定平台帳號 UID，確保最高隱私
+        setupFirebaseListener(); // 💡 拔除 UID 綁定
       }
     });
 
@@ -647,101 +650,114 @@
        updateSyncStatus('syncing');
        if (unsubscribeSnapshot) unsubscribeSnapshot();
 
-       // 回歸高安全性的專屬路徑 (users/UID)，依靠網站帳號來互相辨識
-       const docRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'calculatorData', 'state');
+       // 💡 核心突破：模仿行程助手，改用「公共空間 (public/data)」並綁定網址 AppID。完全打破不同裝置/無痕模式的隔閡！
+       const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'calculatorData', 'global_state');
        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
            if (docSnap.exists()) {
                const data = docSnap.data();
                
-               // 如果雲端資料跟我們自己剛上傳的一樣舊，則忽略 (防回音)
-               if (data.updatedAt && data.updatedAt <= cloudSyncTimestamp) return;
+               // 💡 時間戳防衝突：如果雲端資料的更新時間，比我們剛上傳的時間還舊(或一樣)，就忽略它，避免回音覆寫
+               if (data.updatedAt && data.updatedAt <= lastLocalSyncTime) {
+                   return; 
+               }
+               
+               lastLocalSyncTime = data.updatedAt || Date.now(); // 同步雲端時間戳
 
-               cloudSyncTimestamp = data.updatedAt || Date.now();
-
+               // 這是來自其他裝置的「較新資料」，執行無縫替換
                records = data.records || [];
                tradeHistory = data.tradeHistory || [];
                savedTickers = data.savedTickers || [];
                priceAlerts = data.priceAlerts || [];
                
-               // 觸發中央管理器更新畫面與存檔 (傳入 true 代表不需反推回雲端)
-               commitDataChange(true);
+               // 靜默寫入 LocalStorage，避免再次觸發攔截器上傳
+               window.localStorage.setItem('stockCalcLocalUI_PRO_Silent', 'true');
+               window.localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+               window.localStorage.setItem(STORAGE_KEY_TICKERS, JSON.stringify(savedTickers));
+               window.localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
+               window.localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({records, ticker: els.tickerInput ? els.tickerInput.value : ''}));
+               window.localStorage.removeItem('stockCalcLocalUI_PRO_Silent');
+               
+               calculateCore();
+               renderHistoryTable();
+               if(activeRecordsTab === 'report') renderReport();
+               if(activeRecordsTab === 'details') renderDetails();
+               renderAlerts();
+               renderTickerDropdown();
+               
                updateSyncStatus('synced');
            } else {
-               // 雲端是空的，若本地有舊資料則強制推上雲端
+               // 💡 如果雲端是空的，但電腦本地有舊資料，立刻強制將舊資料「推」上雲端！
                if (records.length > 0 || tradeHistory.length > 0 || savedTickers.length > 0) {
-                   console.log("偵測到本地舊資料，自動備份至雲端...");
-                   pushDataToCloud();
+                   console.log("偵測到本地舊資料，正在自動將舊資料備份至雲端...");
+                   if (typeof window.syncToCloud === 'function') window.syncToCloud(true);
                } else {
                    updateSyncStatus('synced');
                }
            }
        }, (err) => {
            console.error("Firestore Listen Error:", err);
+           if (err.message && err.message.includes('Missing or insufficient permissions')) {
+               console.error("提示：如果您在外部環境使用自己的 Firebase，請至 Firebase Console 修改 Firestore Security Rules 允許讀寫。");
+               showToast('同步失敗：請檢查 Firebase 安全規則', 'error');
+           }
            updateSyncStatus('error');
        });
     }
 
-    // --- 🚀 核心升級：中央狀態管理器 (Central State Manager) ---
-    // 捨棄不穩定且容易被手機截斷的 localStorage 魔法攔截器。
-    // 改為：任何動作 -> 呼叫此函數 -> 一次性更新所有畫面、存檔並光速直推雲端！
-    window.commitDataChange = function(isFromCloud = false) {
-      // 1. 重新結算核心數字
-      totalShares = records.reduce((s, r) => s + r.quantity, 0);
-      totalCost = records.reduce((s, r) => s + r.cost, 0);
-      averagePrice = totalShares > 0 ? totalCost / totalShares : 0;
-
-      // 2. 更新頂部看板數字
-      if(els.totalSharesDisp) els.totalSharesDisp.textContent = formatNumber(totalShares);
-      if(els.totalCostDisp) els.totalCostDisp.textContent = formatNumber(totalCost);
-      if(els.avgPriceDisp) els.avgPriceDisp.textContent = formatNumber(averagePrice, 4);
-
-      const dis = totalShares === 0;
-      if(els.targetPriceInput) els.targetPriceInput.disabled = dis;
-      if(els.percentInput) els.percentInput.disabled = dis;
-      if(els.expectedPnlInput) els.expectedPnlInput.disabled = dis;
-
-      // 3. 寫入本地 LocalStorage 備份 (斷網時的救命丹)
-      localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({records, ticker: els.tickerInput ? els.tickerInput.value : ''}));
-      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
-      localStorage.setItem(STORAGE_KEY_TICKERS, JSON.stringify(savedTickers));
-      localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
-
-      // 4. 重繪所有畫面元件
-      calculatePnl();
-      renderTable();
-      updateCurrentPriceColor();
-      renderHistoryTable();
-      if(activeRecordsTab === 'report') renderReport();
-      if(activeRecordsTab === 'details') renderDetails();
-      renderAlerts();
-      renderTickerDropdown();
-
-      // 5. 如果是使用者手動操作造成的變更，則以主執行緒「光速直推」雲端，手機休眠也攔不住！
-      if (!isFromCloud) {
-          pushDataToCloud();
-      }
-    };
-
-    window.pushDataToCloud = function() {
+    window.syncToCloud = function(forcePush = false) {
        if (!currentUser) return;
        updateSyncStatus('syncing');
        
-       cloudSyncTimestamp = Date.now();
-       const stateToSave = {
-           records,
-           tradeHistory,
-           savedTickers,
-           priceAlerts,
-           updatedAt: cloudSyncTimestamp
-       };
+       if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
        
-       const docRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'calculatorData', 'state');
-       setDoc(docRef, stateToSave)
-           .then(() => updateSyncStatus('synced'))
-           .catch((e) => {
+       const executeUpload = async () => {
+           try {
+               lastLocalSyncTime = Date.now(); // 記錄本次手動更新的時間戳
+               
+               // 💡 對應上方的網址綁定路徑
+               const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'calculatorData', 'global_state');
+               const stateToSave = {
+                   records,
+                   tradeHistory,
+                   savedTickers,
+                   priceAlerts,
+                   updatedAt: lastLocalSyncTime // 將時間戳夾帶上傳
+               };
+               
+               await setDoc(docRef, JSON.parse(JSON.stringify(stateToSave)), { merge: true });
+               updateSyncStatus('synced');
+           } catch (e) {
                console.error("Sync error", e);
+               if (e.message && e.message.includes('Missing or insufficient permissions')) {
+                   showToast('雲端儲存失敗：權限不足，請檢查 Firebase 設定', 'error');
+               }
                updateSyncStatus('error');
-           });
+           }
+       };
+
+       // 💡 如果是強制上傳 (初次備份舊資料)，則跳過 0.8 秒延遲，瞬間上傳
+       if (forcePush) {
+           executeUpload();
+       } else {
+           syncDebounceTimer = setTimeout(executeUpload, 800);
+       }
+    };
+
+    // --- 攔截 localStorage 自動觸發雲端同步 ---
+    const originalSetItem = window.localStorage.setItem;
+    window.localStorage.setItem = function(key, value) {
+        const oldValue = window.localStorage.getItem(key);
+        originalSetItem.apply(window.localStorage, arguments);
+        
+        // 💡 阻擋不必要的重複上傳：只有資料真的有變才觸發，省流量且避免自己覆蓋自己
+        if (oldValue === value) return;
+        
+        // 如果是靜默寫入 (來自雲端下載的資料)，則不觸發上傳
+        if (window.localStorage.getItem('stockCalcLocalUI_PRO_Silent') === 'true') return;
+
+        if ([STORAGE_KEY_STATE, STORAGE_KEY_HISTORY, STORAGE_KEY_TICKERS, STORAGE_KEY_ALERTS].includes(key)) {
+            if (typeof window.syncToCloud === 'function') window.syncToCloud();
+        }
     };
 
     // --- 儲存標籤定義 ---
@@ -1077,7 +1093,10 @@
         return timeB - timeA; 
       });
 
-      commitDataChange(); // 🔥 呼叫中央管理器：更新、存檔並上傳
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+      renderHistoryTable();
+      if(activeRecordsTab === 'report') renderReport();
+      if(activeRecordsTab === 'details') renderDetails();
       
       closeManualHistoryModal();
       document.getElementById('manualHistoryForm').reset();
@@ -1138,7 +1157,66 @@
         return timeB - timeA; 
       });
 
-      commitDataChange(); // 🔥 呼叫中央管理器：更新、存檔並上傳
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+      renderHistoryTable();
+      if(activeRecordsTab === 'report') renderReport();
+      
+      closeManualHistoryModal();
+      document.getElementById('manualHistoryForm').reset();
+      showToast('✅ 手動紀錄已加入', 'success');
+    });
+
+    // --- 編輯歷史紀錄邏輯 ---
+    window.openEditHistoryModal = function(id) {
+      const rec = tradeHistory.find(r => r.id === id);
+      if (!rec) return;
+
+      document.getElementById('ehId').value = rec.id;
+      document.getElementById('ehDate').value = rec.dateStr || new Date().toISOString().split('T')[0];
+      document.getElementById('ehSymbol').value = rec.ticker;
+      document.getElementById('ehQty').value = rec.quantity;
+      document.getElementById('ehBuy').value = rec.price;
+      document.getElementById('ehSell').value = rec.sellPrice !== undefined ? rec.sellPrice : '';
+      document.getElementById('ehFee').value = rec.fee !== undefined ? rec.fee : '';
+
+      document.getElementById('editHistoryModal').classList.remove('hidden');
+      document.getElementById('editHistoryModal').classList.add('flex');
+    };
+
+    window.closeEditHistoryModal = function() {
+      document.getElementById('editHistoryModal').classList.add('hidden');
+      document.getElementById('editHistoryModal').classList.remove('flex');
+    };
+
+    document.getElementById('editHistoryForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('ehId').value;
+      const rec = tradeHistory.find(r => r.id === id);
+      if (!rec) return;
+
+      rec.dateStr = document.getElementById('ehDate').value;
+      const dateObj = new Date(rec.dateStr);
+      rec.time = dateObj.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
+      rec.ticker = document.getElementById('ehSymbol').value.toUpperCase().trim();
+      rec.quantity = parseFloat(document.getElementById('ehQty').value);
+      rec.price = parseFloat(document.getElementById('ehBuy').value);
+      
+      const sellVal = document.getElementById('ehSell').value;
+      rec.sellPrice = sellVal ? parseFloat(sellVal) : undefined;
+      
+      const feeVal = document.getElementById('ehFee').value;
+      rec.fee = feeVal ? parseFloat(feeVal) : 0;
+
+      tradeHistory.sort((a,b) => {
+        let timeA = a.dateStr ? new Date(a.dateStr).getTime() : parseInt(a.id);
+        let timeB = b.dateStr ? new Date(b.dateStr).getTime() : parseInt(b.id);
+        return timeB - timeA;
+      });
+
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+      renderHistoryTable();
+      if(activeRecordsTab === 'report') renderReport();
+      if(activeRecordsTab === 'details') renderDetails();
       
       closeEditHistoryModal();
       showToast('✅ 紀錄已更新', 'success');
@@ -1256,6 +1334,8 @@
     function loadAndMigrateData() {
       let savedStr = localStorage.getItem(STORAGE_KEY_STATE);
       
+      // 修復幽靈紀錄 BUG：只有在完全沒有 V3 存檔時，才進行 V2 遷移
+      // 避免當使用者清空倉位 (records 變成 0 筆) 時，又錯誤載入舊版備份復活
       if (!savedStr) {
         const oldSavedStr = localStorage.getItem('stockCalcStateHTML_PRO_V2');
         if (oldSavedStr) {
@@ -1268,12 +1348,20 @@
         try {
           const saved = JSON.parse(savedStr);
           records = saved.records || [];
+          
+          // 確保載入時，舊資料也會按照 ID (時間戳) 由新到舊排好，最新的在最上面
           records.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+          
           if(els.tickerInput) els.tickerInput.value = saved.ticker || '';
+          // 為了相容升級前的舊版資料，暫時保留讀取
+          if(els.currentPriceDisp && saved.currentPrice) els.currentPriceDisp.value = saved.currentPrice || '';
+          if(els.autoRefreshCheckbox && saved.autoRefresh !== undefined) els.autoRefreshCheckbox.checked = saved.autoRefresh || false;
+          if(els.refreshIntervalInput && saved.refreshInterval) els.refreshIntervalInput.value = saved.refreshInterval || 2;
+          if(saved.dataSource && els.dataSourceSelect) els.dataSourceSelect.value = saved.dataSource;
         } catch(e) {}
       }
       
-      // 讀取純本地 UI 設定
+      // 讀取純本地 UI 設定 (不參與雲端同步)
       let uiStr = localStorage.getItem('stockCalcLocalUI_PRO');
       if (uiStr) {
         try {
@@ -1288,8 +1376,9 @@
       tradeHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY)) || [];
       if(els.chartIntervalSelect) els.chartIntervalSelect.value = currentChartInterval;
       
-      // 首次載入只將資料畫上畫面，不主動推上雲端
-      commitDataChange(true); 
+      calculateCore();
+      renderHistoryTable();
+      renderAlerts();
     }
 
     // --- 代號與提醒邏輯 ---
@@ -1298,7 +1387,7 @@
       savedTickers = savedTickers.filter(t => t !== symbol);
       savedTickers.unshift(symbol);
       if (savedTickers.length > 20) savedTickers.pop();
-      commitDataChange(); // 🔥 呼叫中央管理器
+      localStorage.setItem(STORAGE_KEY_TICKERS, JSON.stringify(savedTickers));
     }
 
     function renderTickerDropdown() {
@@ -1326,7 +1415,8 @@
     window.removeSavedTicker = function(ticker, event) {
       event.stopPropagation();
       savedTickers = savedTickers.filter(t => t !== ticker);
-      commitDataChange(); // 🔥 呼叫中央管理器
+      localStorage.setItem(STORAGE_KEY_TICKERS, JSON.stringify(savedTickers));
+      renderTickerDropdown();
     };
 
     if(els.tickerInput) els.tickerInput.addEventListener('focus', () => { renderTickerDropdown(); if(els.tickerDropdown) els.tickerDropdown.classList.remove('hidden'); });
@@ -1388,7 +1478,8 @@
       if (alert) {
         alert.isActive = isChecked;
         if(!isChecked) alert.isTriggered = false; 
-        commitDataChange(); // 🔥 呼叫中央管理器
+        localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
+        renderAlerts();
       }
     };
 
@@ -1403,9 +1494,10 @@
         const t = els.alertType ? els.alertType.value : 'once';
         
         priceAlerts.unshift({ id: Date.now().toString(), ticker: sym, condition: c, price: p, type: t, isTriggered: false, isActive: true });
+        localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
         
         els.alertPrice.value = '';
-        commitDataChange(); // 🔥 呼叫中央管理器
+        renderAlerts();
         showToast(`✅ 已新增提醒：當 ${sym} ${c === '>' ? '漲到' : '跌到'} ${p} 時通知`, 'success');
         
         requestNotificationPermission();
@@ -1414,7 +1506,8 @@
 
     window.deleteAlert = function(id) {
       priceAlerts = priceAlerts.filter(a => a.id !== id);
-      commitDataChange(); // 🔥 呼叫中央管理器
+      localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
+      renderAlerts();
     };
 
     function checkPriceAlerts(symbol, currentPrice) {
@@ -1469,7 +1562,8 @@
             renderAlerts();
           }, 60000); // 1分鐘後熄滅光暈
         }
-        commitDataChange(); // 🔥 呼叫中央管理器
+        localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
+        renderAlerts();
       }
     }
 
@@ -1725,7 +1819,7 @@
             }
           }
         }
-        saveUIStateLocal(); // UI 狀態不觸發雲端上傳
+        saveData();
       });
     }
 
@@ -1797,8 +1891,8 @@
           const data = await res.json();
           if (data && data.c) { 
             if(els.currentPriceDisp) els.currentPriceDisp.value = data.c; 
-            updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c); 
-            saveUIStateLocal(); // UI 狀態不觸發雲端上傳
+            updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c); saveData(); 
+            // 傳入 Finnhub 提供的真實數據源時間戳 (data.t)
             updateLastFetchTime(data.t);
           }
         } else {
@@ -1811,8 +1905,8 @@
           if (data && data.price) {
             const price = parseFloat(data.price);
             if(els.currentPriceDisp) els.currentPriceDisp.value = price;
-            updateCurrentPriceColor(); checkPriceAlerts(symbol, price); 
-            saveUIStateLocal(); // UI 狀態不觸發雲端上傳
+            updateCurrentPriceColor(); checkPriceAlerts(symbol, price); saveData();
+            // TwelveData /price 端點僅提供價格，此處作為 Fallback
             updateLastFetchTime();
           } else {
              showToast('無法取得該代號之全市場報價', 'error');
@@ -1844,8 +1938,8 @@
             if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== data.c) {
               els.currentPriceDisp.value = data.c; updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c);
             }
+            // 傳入 Finnhub 提供的真實數據源時間戳 (data.t)
             updateLastFetchTime(data.t);
-            saveUIStateLocal();
           }
         } else {
            const res = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${TWELVE_DATA_API_KEY}`);
@@ -1860,8 +1954,8 @@
               if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== price) {
                 els.currentPriceDisp.value = price; updateCurrentPriceColor(); checkPriceAlerts(symbol, price);
               }
+              // TwelveData /price 端點僅提供價格，此處作為 Fallback
               updateLastFetchTime();
-              saveUIStateLocal();
            }
         }
       } catch (err) {}
@@ -1879,7 +1973,7 @@
           quoteInterval = setInterval(fetchQuoteOnly, sec * 1000); 
         }
         else clearInterval(quoteInterval);
-        saveUIStateLocal();
+        saveData();
       });
     }
 
@@ -1890,21 +1984,40 @@
           let sec = Math.max(1, parseFloat(els.refreshIntervalInput.value) || 2); 
           quoteInterval = setInterval(fetchQuoteOnly, sec * 1000); 
         } 
-        saveUIStateLocal(); 
+        saveData(); 
       });
     }
 
     if(els.fetchBtn) els.fetchBtn.addEventListener('click', fetchStockData);
     if(els.tickerInput) els.tickerInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fetchStockData(); }});
 
-    function saveUIStateLocal() {
-      // 介面與跳動數據：僅存本地，不消耗雲端流量，不觸發 Firebase 上傳
+    function saveData() {
+      // 核心資料：會觸發攔截器進行雲端同步
+      localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({
+        records, ticker: els.tickerInput ? els.tickerInput.value : ''
+      }));
+      
+      // 介面與跳動數據：僅存本地，不消耗雲端流量
       localStorage.setItem('stockCalcLocalUI_PRO', JSON.stringify({
         currentPrice: els.currentPriceDisp ? els.currentPriceDisp.value : '',
         autoRefresh: els.autoRefreshCheckbox ? els.autoRefreshCheckbox.checked : false, 
         refreshInterval: els.refreshIntervalInput ? els.refreshIntervalInput.value : 2,
         dataSource: els.dataSourceSelect ? els.dataSourceSelect.value : 'finnhub'
       }));
+    }
+
+    function calculateCore() {
+      totalShares = records.reduce((s, r) => s + r.quantity, 0);
+      totalCost = records.reduce((s, r) => s + r.cost, 0);
+      averagePrice = totalShares > 0 ? totalCost / totalShares : 0;
+      if(els.totalSharesDisp) els.totalSharesDisp.textContent = formatNumber(totalShares);
+      if(els.totalCostDisp) els.totalCostDisp.textContent = formatNumber(totalCost);
+      if(els.avgPriceDisp) els.avgPriceDisp.textContent = formatNumber(averagePrice, 4);
+      const dis = totalShares === 0;
+      if(els.targetPriceInput) els.targetPriceInput.disabled = dis; 
+      if(els.percentInput) els.percentInput.disabled = dis; 
+      if(els.expectedPnlInput) els.expectedPnlInput.disabled = dis;
+      calculatePnl(); renderTable(); updateCurrentPriceColor(); saveData();
     }
 
     if(els.targetPriceInput) els.targetPriceInput.addEventListener('input', () => { activeTargetMode = 'price'; calculatePnl(); });
@@ -2013,9 +2126,6 @@
     if(els.addForm) {
       els.addForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        
-        if(document.activeElement) document.activeElement.blur();
-
         const p = parseFloat(els.priceInput.value), q = parseFloat(els.qtyInput.value), s = els.tickerInput.value.toUpperCase().trim() || '-';
         if (isNaN(p) || p <= 0 || isNaN(q) || q <= 0) return;
         
@@ -2025,6 +2135,7 @@
         const now = new Date();
         const timeStr = now.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'}) + ' ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         
+        // 改為 unshift 將最新紀錄推到陣列最前面 (最上方)
         records.unshift({ id: Date.now().toString(), ticker: s, price: p, quantity: q, cost: p * q, direction: dir });
         tradeHistory.unshift({ 
           id: Date.now().toString()+'h', 
@@ -2034,29 +2145,31 @@
         });
         
         if (tradeHistory.length > 200) tradeHistory.pop();
-        els.priceInput.value = ''; els.qtyInput.value = ''; 
-        
-        commitDataChange(); // 🔥 呼叫中央管理器：更新、存檔並上傳
-        
+        els.priceInput.value = ''; els.qtyInput.value = ''; calculateCore(); renderHistoryTable(); localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+        if(activeRecordsTab === 'details') renderDetails();
         showToast('紀錄已新增', 'success');
       });
     }
 
-    window.deleteRecord = (id) => { 
-      records = records.filter(r => r.id !== id); 
-      commitDataChange(); // 🔥 呼叫中央管理器
-    };
+    window.deleteRecord = (id) => { records = records.filter(r => r.id !== id); calculateCore(); };
     
     window.deleteHistoryRecord = (id) => { 
       tradeHistory = tradeHistory.filter(r => r.id !== id); 
-      commitDataChange(); // 🔥 呼叫中央管理器
+      renderHistoryTable(); 
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory)); 
+      if(activeRecordsTab === 'report') renderReport();
+      if(activeRecordsTab === 'details') renderDetails();
     };
     
+    // 更新歷史紀錄中的賣出價與手續費
     window.updateHistoryTrade = function(id, field, value) {
       const record = tradeHistory.find(r => r.id === id);
       if (record) {
         record[field] = value;
-        commitDataChange(); // 🔥 呼叫中央管理器
+        localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
+        renderHistoryTable();
+        if(activeRecordsTab === 'report') renderReport();
+        if(activeRecordsTab === 'details') renderDetails();
       }
     };
 
