@@ -602,9 +602,9 @@
     
     // --- 核心重製：連線識別碼 (Session ID) 與 狀態鎖 ---
     const myClientId = Math.random().toString(36).substring(2, 15); 
-    let syncDebounceTimer = null;
     let isSystemUpdating = false;    // 🔴 鎖定：系統正在處理畫面，禁止上傳
     let hasInitialCloudSync = false; // 🔴 鎖定：尚未確認雲端狀態前，禁止任何上傳覆蓋行為
+    let lastUserActionTime = 0;      // 🔴 記錄最後一次使用者操作，防止回音蓋畫面
 
     const syncStatusEl = document.getElementById('cloudSyncStatus');
     function updateSyncStatus(status) {
@@ -709,33 +709,26 @@
 
        updateSyncStatus('syncing');
        
-       if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+       // 💡 徹底拔除 `setTimeout` 延遲機制！
+       // 手機瀏覽器在表單送出或收起鍵盤時，極容易殺死或凍結背景的延遲任務，導致資料「感覺沒存到」。
+       // 改為立即執行 (Fire and Forget)，強制將任務塞入 Firebase 傳輸底層，保證手機絕對不漏拍！
+       const stateToSave = {
+           records,
+           tradeHistory,
+           savedTickers,
+           priceAlerts,
+           lastUpdatedBy: myClientId // 夾帶自己的識別碼
+       };
        
-       const executeUpload = async () => {
-           try {
-               const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'calculatorData', 'global_state');
-               const stateToSave = {
-                   records,
-                   tradeHistory,
-                   savedTickers,
-                   priceAlerts,
-                   lastUpdatedBy: myClientId // 夾帶自己的識別碼
-               };
-               
-               await setDoc(docRef, JSON.parse(JSON.stringify(stateToSave)), { merge: true });
+       const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'calculatorData', 'global_state');
+       setDoc(docRef, JSON.parse(JSON.stringify(stateToSave)), { merge: true })
+           .then(() => {
                updateSyncStatus('synced');
-           } catch (e) {
+           })
+           .catch((e) => {
                console.error("Sync error", e);
                updateSyncStatus('error');
-           }
-       };
-
-       // 將延遲大幅縮短至 10ms，確保秒關螢幕也能成功上傳
-       if (forcePush) {
-           executeUpload();
-       } else {
-           syncDebounceTimer = setTimeout(executeUpload, 10);
-       }
+           });
     };
 
     // --- 攔截 localStorage 自動觸發雲端同步 ---
@@ -753,6 +746,7 @@
         if (isSystemUpdating) return;
 
         if ([STORAGE_KEY_STATE, STORAGE_KEY_HISTORY, STORAGE_KEY_TICKERS, STORAGE_KEY_ALERTS].includes(key)) {
+            lastUserActionTime = Date.now(); // 更新最後操作時間
             if (typeof window.syncToCloud === 'function') window.syncToCloud();
         }
     };
@@ -2123,6 +2117,10 @@
     if(els.addForm) {
       els.addForm.addEventListener('submit', (e) => {
         e.preventDefault();
+        
+        // 💡 加入這行：強制收起手機小鍵盤，防止 iOS Safari 版面彈跳導致執行緒卡死
+        if(document.activeElement) document.activeElement.blur();
+
         const p = parseFloat(els.priceInput.value), q = parseFloat(els.qtyInput.value), s = els.tickerInput.value.toUpperCase().trim() || '-';
         if (isNaN(p) || p <= 0 || isNaN(q) || q <= 0) return;
         
