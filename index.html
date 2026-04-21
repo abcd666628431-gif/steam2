@@ -66,10 +66,10 @@
 <body class="min-h-screen p-1.5 md:p-6">
 
   <!-- 浮動通知容器 (Toast) -->
-  <div id="toastContainer" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+  <div id="toastContainer" class="fixed top-5 right-5 z-[99999] flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- 自訂彈窗 (Modal) -->
-  <div id="universalModal" class="fixed inset-0 z-[999] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div id="universalModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
     <div class="bg-[#1e1e1e] border border-[#333] p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 transform transition-all">
       <h3 id="uModalTitle" class="text-white font-bold mb-3 text-lg flex items-center">系統提示</h3>
       <p id="uModalText" class="text-slate-300 text-sm mb-5 break-words"></p>
@@ -316,11 +316,12 @@
           </form>
         </div>
 
-        <!-- 試算工具 (包含價位提醒) -->
+        <!-- 試算工具 (包含價位提醒與波段分析) -->
         <div class="card-panel p-1.5 md:p-2 rounded-xl flex flex-col">
           <div class="flex space-x-1 bg-[#0F0F0F] p-1 rounded-lg mb-2 overflow-x-auto no-scrollbar">
             <button id="btn-tab-target" onclick="switchTab('target')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md bg-[#2979ff] text-white font-bold transition-all">預期試算</button>
             <button id="btn-tab-single" onclick="switchTab('single')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all">單筆計算</button>
+            <button id="btn-tab-volatility" onclick="switchTab('volatility')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all">波段分析</button>
             <button id="btn-tab-alert" onclick="switchTab('alert')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all flex items-center justify-center gap-1">
               <span>🔔 提醒</span>
             </button>
@@ -353,6 +354,53 @@
             </div>
             <input id="singleQtyInput" type="number" step="any" placeholder="股數 (選填)" class="w-full px-3 py-1.5 text-sm font-bold rounded-lg border border-[#444]">
             <div id="singleResult" class="hidden mt-2 p-2 rounded-lg border border-[#555] text-sm bg-[#2a2a2a]"></div>
+          </div>
+          
+          <!-- Tab: 波段分析 (全新升級) -->
+          <div id="tab-volatility" class="hidden space-y-2 px-1 pb-1">
+            <div class="grid grid-cols-2 gap-2 border-b border-[#333] pb-2">
+              <input id="volHighInput" type="number" step="any" placeholder="手動波段高點" class="w-full px-3 py-1.5 text-sm font-bold rounded-lg border border-[#444]">
+              <input id="volLowInput" type="number" step="any" placeholder="手動波段低點" class="w-full px-3 py-1.5 text-sm font-bold rounded-lg border border-[#444]">
+            </div>
+            <div id="volManualResult" class="hidden grid grid-cols-2 gap-2 text-center mt-2">
+              <div class="bg-[#1e1e1e] p-1.5 rounded border border-[#555]">
+                <div class="text-[10px] text-slate-400">轉跌幅回撤</div>
+                <div id="volManualDrop" class="font-bold text-[#ff5252]">-</div>
+              </div>
+              <div class="bg-[#1e1e1e] p-1.5 rounded border border-[#555]">
+                <div class="text-[10px] text-slate-400">所需反彈重回升勢</div>
+                <div id="volManualRise" class="font-bold text-[#00e676]">-</div>
+              </div>
+            </div>
+
+            <div class="flex gap-2 mt-2">
+              <button type="button" id="btnAnalyzeVolToday" class="flex-1 bg-[#2a2a2a] hover:bg-[#333] border border-[#2979ff]/50 text-[#2979ff] text-[11px] font-bold py-1.5 rounded-lg transition-colors">
+                 📉 分析當日波動
+              </button>
+              <button type="button" id="btnAnalyzeVol30D" class="flex-1 bg-[#2a2a2a] hover:bg-[#333] border border-[#2979ff]/50 text-[#2979ff] text-[11px] font-bold py-1.5 rounded-lg transition-colors">
+                 📅 近30日分析
+              </button>
+            </div>
+            
+            <div id="volatilityResultTitle" class="text-[10px] text-center text-slate-400 mt-3 hidden font-bold tracking-widest">--- 分析結果 ---</div>
+            <div id="volatilityResult" class="grid grid-cols-3 gap-2 mt-1 hidden">
+              <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center justify-center col-span-1">
+                <span class="text-[9px] text-slate-400 font-bold mb-1">最大單次跌幅</span>
+                <span id="volMaxDrop" class="text-xs font-bold text-[#ff5252]">-</span>
+              </div>
+              <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center justify-center col-span-1">
+                <span class="text-[9px] text-slate-400 font-bold mb-1">最小單次跌幅</span>
+                <span id="volMinDrop" class="text-xs font-bold text-[#ff5252]">-</span>
+              </div>
+              <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center justify-center col-span-1">
+                <span class="text-[9px] text-slate-400 font-bold mb-1">平均每次跌幅</span>
+                <span id="volAvgDrop" class="text-xs font-bold text-[#ff5252]">-</span>
+              </div>
+              <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center justify-center col-span-3">
+                <span class="text-[10px] text-slate-400 font-bold mb-0.5">平均所需反彈重回升勢</span>
+                <span id="volAvgRebound" class="text-sm font-bold text-[#00e676]">-</span>
+              </div>
+            </div>
           </div>
 
           <!-- Tab: 價位提醒 -->
@@ -401,7 +449,7 @@
         </div>
       </div>
 
-      <!-- 右側：看板、圖表與列表 (flex-1 讓它自由填滿剩餘的巨大空間) -->
+      <!-- 右側：看板、圖表與列表 -->
       <div class="flex-1 min-w-0 space-y-2 md:space-y-4">
         
         <!-- 核心看板 (極限壓縮為一行 5 欄) -->
@@ -431,7 +479,7 @@
           </div>
         </div>
 
-        <!-- 圖表 (縮減手機版高度) -->
+        <!-- 圖表 -->
         <div class="card-panel p-2 md:p-4 rounded-2xl flex flex-col">
           <div class="flex justify-between items-center mb-1.5 md:mb-3">
             <div class="flex items-center space-x-2 md:space-x-3">
@@ -449,7 +497,7 @@
           <div id="tvchart" class="w-full h-[260px] md:h-[450px] bg-[#0F0F0F] rounded-xl overflow-hidden border border-[#333]"></div>
         </div>
 
-        <!-- 列表 (縮減表格 Padding) -->
+        <!-- 列表 -->
         <div class="card-panel rounded-2xl overflow-hidden flex flex-col flex-1 min-h-[300px]">
           <div class="p-2 md:p-4 border-b border-[#333] flex justify-between items-center bg-[#1e1e1e]">
             <div class="flex space-x-2 md:space-x-6 overflow-x-auto no-scrollbar">
@@ -500,7 +548,7 @@
             </table>
           </div>
 
-          <!-- 新增：收益報表視圖 -->
+          <!-- 收益報表視圖 -->
           <div id="reportView" class="hidden p-2 md:p-4 max-h-[650px] overflow-y-auto custom-scrollbar bg-[#1e1e1e]">
             <div class="flex justify-between items-center mb-5">
               <h3 class="text-sm font-bold text-white flex items-center">收益日曆 <span class="text-[10px] ml-2 text-slate-400 font-normal bg-slate-800 px-1.5 py-0.5 rounded border border-slate-600">依已平倉結算</span></h3>
@@ -522,19 +570,25 @@
               <div class="text-[11px] text-slate-400 font-bold py-1">六</div>
             </div>
             <div id="reportCalendarGrid" class="grid grid-cols-7 gap-1.5"></div>
-            <div class="mt-5 flex justify-between items-end border-t border-[#333] pt-4">
-              <div>
-                <div class="text-[11px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">月累計收益 (<span id="reportCurrencyLabel">USD</span>)</div>
-                <div id="reportMonthTotal" class="text-3xl font-bold text-[#00e676]">+0.00</div>
+            
+            <!-- 三大累計統計 -->
+            <div class="mt-5 grid grid-cols-3 gap-2 border-t border-[#333] pt-4">
+              <div class="text-left">
+                <div class="text-[10px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">月累計 (<span id="reportCurrencyLabelMonth">USD</span>)</div>
+                <div id="reportMonthTotal" class="text-lg md:text-xl font-bold">+0.00</div>
+              </div>
+              <div class="text-center">
+                <div class="text-[10px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">年累計 (<span id="reportCurrencyLabelYear">USD</span>)</div>
+                <div id="reportYearTotal" class="text-lg md:text-xl font-bold">+0.00</div>
               </div>
               <div class="text-right">
-                <div class="text-[11px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">年累計收益 (<span id="reportYearCurrencyLabel">USD</span>)</div>
-                <div id="reportYearTotal" class="text-xl md:text-2xl font-bold text-[#00e676]">+0.00</div>
+                <div class="text-[10px] text-slate-500 mb-0.5 font-bold uppercase tracking-wider">總累計 (<span id="reportCurrencyLabelGrand">USD</span>)</div>
+                <div id="reportGrandTotal" class="text-lg md:text-xl font-bold">+0.00</div>
               </div>
             </div>
           </div>
 
-          <!-- 新增：盈虧明細視圖 -->
+          <!-- 盈虧明細視圖 -->
           <div id="detailsView" class="hidden p-4 max-h-[650px] min-h-[400px] overflow-y-auto custom-scrollbar bg-[#1e1e1e]">
             <div class="flex justify-between items-start mb-4">
               <div>
@@ -577,7 +631,6 @@
 
     let firebaseConfig;
     try {
-      // 優先使用平台環境提供的合法安全配置，若無則降級使用使用者自訂的設定
       firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
         apiKey: "AIzaSyAp9LarWFf1Cru8VyzfMPeTKLmjgJumEmU",
         authDomain: "stockstock-432d5.firebaseapp.com",
@@ -624,13 +677,10 @@
           await signInAnonymously(auth);
         }
       } catch (error) {
-        console.error("Auth Initial Error:", error);
         try { 
           await signInAnonymously(auth); 
         } catch(e) { 
-          console.error("Auth Fallback Error:", e);
           updateSyncStatus('error'); 
-          showToast('連線失敗：請至 Firebase 啟用「匿名登入 (Anonymous)」', 'error');
         }
       }
     };
@@ -647,20 +697,15 @@
        updateSyncStatus('syncing');
        if (unsubscribeSnapshot) unsubscribeSnapshot();
 
-       // 🔥 已更改：使用 Public 共用路徑，不需要登入綁定也不需要手動輸入同步碼
-       // 任何使用此網址打開的使用者，讀寫的都是這一個 "globalState"
        const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'shared', 'globalState');
        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
            if (docSnap.exists()) {
                const data = docSnap.data();
                
-               // 1. 防回音機制
                if (data.updatedAt && data.updatedAt <= cloudSyncTimestamp) return;
 
-               // 2. 本地時間戳防禦機制
                const localSavedTime = parseInt(localStorage.getItem('stockCalcLastLocalUpdate_PRO') || '0');
                if (localSavedTime > (data.updatedAt + 5000)) {
-                   console.log("偵測到本地資料較新，執行反向同步至雲端...");
                    pushDataToCloud();
                    return; 
                }
@@ -672,21 +717,16 @@
                savedTickers = data.savedTickers || [];
                priceAlerts = data.priceAlerts || [];
                
-               // 觸發中央管理器更新畫面與存檔 (傳入 true 代表不需反推回雲端)
                commitDataChange(true);
                updateSyncStatus('synced');
            } else {
-               // 雲端是空的，若本地有舊資料則強制推上雲端
                if (records.length > 0 || tradeHistory.length > 0 || savedTickers.length > 0) {
-                   console.log("偵測到本地舊資料，自動備份至雲端...");
                    pushDataToCloud();
                } else {
                    updateSyncStatus('synced');
                }
            }
        }, (err) => {
-           console.error("Firestore Listen Error:", err);
-           // 顯示詳細錯誤，方便除錯是不是權限問題
            if(err.code === 'permission-denied') {
               showToast('同步失敗：資料庫權限不足', 'error');
            }
@@ -694,14 +734,11 @@
        });
     }
 
-    // --- 🚀 核心升級：中央狀態管理器 (Central State Manager) ---
     window.commitDataChange = function(isFromCloud = false) {
-      // 1. 重新結算核心數字
       totalShares = records.reduce((s, r) => s + r.quantity, 0);
       totalCost = records.reduce((s, r) => s + r.cost, 0);
       averagePrice = totalShares > 0 ? totalCost / totalShares : 0;
 
-      // 2. 更新頂部看板數字
       if(els.totalSharesDisp) els.totalSharesDisp.textContent = formatNumber(totalShares);
       if(els.totalCostDisp) els.totalCostDisp.textContent = formatNumber(totalCost);
       if(els.avgPriceDisp) els.avgPriceDisp.textContent = formatNumber(averagePrice, 4);
@@ -711,18 +748,15 @@
       if(els.percentInput) els.percentInput.disabled = dis;
       if(els.expectedPnlInput) els.expectedPnlInput.disabled = dis;
 
-      // 3. 寫入本地 LocalStorage 備份 (斷網時的救命丹)
       localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({records, ticker: els.tickerInput ? els.tickerInput.value : ''}));
       localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
       localStorage.setItem(STORAGE_KEY_TICKERS, JSON.stringify(savedTickers));
       localStorage.setItem(STORAGE_KEY_ALERTS, JSON.stringify(priceAlerts));
       
-      // 🔥 新增：記錄本地最後操作時間
       if (!isFromCloud) {
           localStorage.setItem('stockCalcLastLocalUpdate_PRO', Date.now().toString());
       }
 
-      // 4. 重繪所有畫面元件
       calculatePnl();
       renderTable();
       updateCurrentPriceColor();
@@ -732,7 +766,6 @@
       renderAlerts();
       renderTickerDropdown();
 
-      // 5. 如果是使用者手動操作造成的變更，則以主執行緒「光速直推」雲端，手機休眠也攔不住！
       if (!isFromCloud) {
           pushDataToCloud();
       }
@@ -751,12 +784,12 @@
            updatedAt: cloudSyncTimestamp
        };
        
-       // 🔥 已更改：使用 Public 共用路徑
+       const cleanStateToSave = JSON.parse(JSON.stringify(stateToSave));
+       
        const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'shared', 'globalState');
-       setDoc(docRef, stateToSave)
+       setDoc(docRef, cleanStateToSave)
            .then(() => updateSyncStatus('synced'))
            .catch((e) => {
-               console.error("Sync error", e);
                updateSyncStatus('error');
                if(e.code === 'permission-denied') {
                   showToast('權限不足，請更新 Firebase Rules', 'error');
@@ -781,12 +814,11 @@
     let savedTickers = JSON.parse(localStorage.getItem(STORAGE_KEY_TICKERS)) || [];
     let priceAlerts = JSON.parse(localStorage.getItem(STORAGE_KEY_ALERTS)) || [];
     
-    // 新增：追蹤目前觸發長亮的卡片 ID 與計時器
     let currentHighlightedAlertId = null;
     let highlightTimeout = null;
     
     let activeRecordsTab = 'current';
-    let activeDetailsFilter = 'profit'; // 追蹤盈虧明細的篩選器狀態
+    let activeDetailsFilter = 'profit'; 
     
     let averagePrice = 0, totalShares = 0, totalCost = 0;
     let activeTargetMode = 'price'; 
@@ -839,7 +871,7 @@
       singleQtyInput: document.getElementById('singleQtyInput'),
       singleResult: document.getElementById('singleResult'),
       
-      // Alerts
+      // Alerts & Volatility
       alertForm: document.getElementById('alertForm'),
       alertCondition: document.getElementById('alertCondition'),
       alertPrice: document.getElementById('alertPrice'),
@@ -851,6 +883,23 @@
       soundUploadInput: document.getElementById('soundUploadInput'),
       soundStatusText: document.getElementById('soundStatusText'),
       resetSoundBtn: document.getElementById('resetSoundBtn'),
+      
+      // 波段分析元件
+      btnTabVolatility: document.getElementById('btn-tab-volatility'),
+      tabVolatility: document.getElementById('tab-volatility'),
+      volHighInput: document.getElementById('volHighInput'),
+      volLowInput: document.getElementById('volLowInput'),
+      volManualResult: document.getElementById('volManualResult'),
+      volManualDrop: document.getElementById('volManualDrop'),
+      volManualRise: document.getElementById('volManualRise'),
+      btnAnalyzeVolToday: document.getElementById('btnAnalyzeVolToday'),
+      btnAnalyzeVol30D: document.getElementById('btnAnalyzeVol30D'),
+      volatilityResultTitle: document.getElementById('volatilityResultTitle'),
+      volatilityResult: document.getElementById('volatilityResult'),
+      volMaxDrop: document.getElementById('volMaxDrop'),
+      volMinDrop: document.getElementById('volMinDrop'),
+      volAvgDrop: document.getElementById('volAvgDrop'),
+      volAvgRebound: document.getElementById('volAvgRebound'),
 
       // Display
       currentPriceDisp: document.getElementById('currentPriceDisp'),
@@ -882,11 +931,13 @@
       // Report
       reportMonthPicker: document.getElementById('reportMonthPicker'),
       reportCurrencySelect: document.getElementById('reportCurrencySelect'),
-      reportCurrencyLabel: document.getElementById('reportCurrencyLabel'),
-      reportYearCurrencyLabel: document.getElementById('reportYearCurrencyLabel'),
+      reportCurrencyLabelMonth: document.getElementById('reportCurrencyLabelMonth'),
+      reportCurrencyLabelYear: document.getElementById('reportCurrencyLabelYear'),
+      reportCurrencyLabelGrand: document.getElementById('reportCurrencyLabelGrand'),
       reportCalendarGrid: document.getElementById('reportCalendarGrid'),
       reportMonthTotal: document.getElementById('reportMonthTotal'),
       reportYearTotal: document.getElementById('reportYearTotal'),
+      reportGrandTotal: document.getElementById('reportGrandTotal'),
 
       // Details
       detailsCurrencySelect: document.getElementById('detailsCurrencySelect'),
@@ -1046,7 +1097,7 @@
             reader.readAsText(file);
           }
         });
-        e.target.value = ''; // 清空，允許重複選取相同檔案
+        e.target.value = ''; 
       });
     }
 
@@ -1068,7 +1119,7 @@
       const sym = document.getElementById('mhSymbol').value.toUpperCase().trim();
       const qty = parseFloat(document.getElementById('mhQty').value);
       const buy = parseFloat(document.getElementById('mhBuy').value);
-      const sell = document.getElementById('mhSell').value ? parseFloat(document.getElementById('mhSell').value) : undefined;
+      const sell = document.getElementById('mhSell').value ? parseFloat(document.getElementById('mhSell').value) : null;
       const fee = document.getElementById('mhFee').value ? parseFloat(document.getElementById('mhFee').value) : 0;
       
       const dirRadio = document.querySelector('input[name="mhDirection"]:checked');
@@ -1097,7 +1148,7 @@
         return timeB - timeA; 
       });
 
-      commitDataChange(); // 🔥 呼叫中央管理器：更新、存檔並上傳
+      commitDataChange(); 
       
       closeManualHistoryModal();
       document.getElementById('manualHistoryForm').reset();
@@ -1114,8 +1165,8 @@
       document.getElementById('ehSymbol').value = rec.ticker;
       document.getElementById('ehQty').value = rec.quantity;
       document.getElementById('ehBuy').value = rec.price;
-      document.getElementById('ehSell').value = rec.sellPrice !== undefined ? rec.sellPrice : '';
-      document.getElementById('ehFee').value = rec.fee !== undefined ? rec.fee : '';
+      document.getElementById('ehSell').value = rec.sellPrice != null ? rec.sellPrice : '';
+      document.getElementById('ehFee').value = rec.fee != null ? rec.fee : '';
       
       const isShort = rec.direction === 'short';
       if(document.getElementById('ehDirShort')) document.getElementById('ehDirShort').checked = isShort;
@@ -1144,7 +1195,7 @@
       rec.price = parseFloat(document.getElementById('ehBuy').value);
       
       const sellVal = document.getElementById('ehSell').value;
-      rec.sellPrice = sellVal ? parseFloat(sellVal) : undefined;
+      rec.sellPrice = sellVal ? parseFloat(sellVal) : null;
       
       const feeVal = document.getElementById('ehFee').value;
       rec.fee = feeVal ? parseFloat(feeVal) : 0;
@@ -1158,7 +1209,7 @@
         return timeB - timeA; 
       });
 
-      commitDataChange(); // 🔥 呼叫中央管理器：更新、存檔並上傳
+      commitDataChange();
       
       closeEditHistoryModal();
       showToast('✅ 紀錄已更新', 'success');
@@ -1166,11 +1217,16 @@
 
     document.getElementById('ehDeleteBtn').addEventListener('click', () => {
       const id = document.getElementById('ehId').value;
-      if(confirm('確定要永久刪除此筆交易紀錄嗎？')) {
-        deleteHistoryRecord(id);
-        closeEditHistoryModal();
-        showToast('🗑️ 紀錄已刪除', 'info');
-      }
+      showModal({
+        type: 'confirm',
+        title: '🗑️ 刪除歷史紀錄',
+        text: '確定要永久刪除此筆交易紀錄嗎？',
+        onConfirm: () => {
+          deleteHistoryRecord(id);
+          closeEditHistoryModal();
+          showToast('🗑️ 紀錄已刪除', 'info');
+        }
+      });
     });
 
     // --- 桌面通知 (Browser Notification) ---
@@ -1308,7 +1364,6 @@
       tradeHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY)) || [];
       if(els.chartIntervalSelect) els.chartIntervalSelect.value = currentChartInterval;
       
-      // 首次載入只將資料畫上畫面，不主動推上雲端
       commitDataChange(true); 
     }
 
@@ -1318,7 +1373,7 @@
       savedTickers = savedTickers.filter(t => t !== symbol);
       savedTickers.unshift(symbol);
       if (savedTickers.length > 20) savedTickers.pop();
-      commitDataChange(); // 🔥 呼叫中央管理器
+      commitDataChange(); 
     }
 
     function renderTickerDropdown() {
@@ -1346,7 +1401,7 @@
     window.removeSavedTicker = function(ticker, event) {
       event.stopPropagation();
       savedTickers = savedTickers.filter(t => t !== ticker);
-      commitDataChange(); // 🔥 呼叫中央管理器
+      commitDataChange(); 
     };
 
     if(els.tickerInput) els.tickerInput.addEventListener('focus', () => { renderTickerDropdown(); if(els.tickerDropdown) els.tickerDropdown.classList.remove('hidden'); });
@@ -1370,7 +1425,6 @@
           const typeText = a.type === 'multi' ? '持續' : '單次';
           const priceColor = a.isActive ? (isUpType ? 'text-[#00e676]' : 'text-[#ff5252]') : 'text-slate-400';
           
-          // 判斷是否為當前觸發長亮的卡片，給予光暈特效
           const isHighlighted = (a.id === currentHighlightedAlertId);
           const bgClass = isHighlighted ? (isUpType ? 'bg-[#00e676]/20' : 'bg-[#ff5252]/20') : 'bg-[#2a2a2a]';
           const borderClass = isHighlighted ? (isUpType ? 'border-[#00e676]' : 'border-[#ff5252]') : 'border-[#444]';
@@ -1408,7 +1462,7 @@
       if (alert) {
         alert.isActive = isChecked;
         if(!isChecked) alert.isTriggered = false; 
-        commitDataChange(); // 🔥 呼叫中央管理器
+        commitDataChange(); 
       }
     };
 
@@ -1425,7 +1479,7 @@
         priceAlerts.unshift({ id: Date.now().toString(), ticker: sym, condition: c, price: p, type: t, isTriggered: false, isActive: true });
         
         els.alertPrice.value = '';
-        commitDataChange(); // 🔥 呼叫中央管理器
+        commitDataChange();
         showToast(`✅ 已新增提醒：當 ${sym} ${c === '>' ? '漲到' : '跌到'} ${p} 時通知`, 'success');
         
         requestNotificationPermission();
@@ -1434,7 +1488,7 @@
 
     window.deleteAlert = function(id) {
       priceAlerts = priceAlerts.filter(a => a.id !== id);
-      commitDataChange(); // 🔥 呼叫中央管理器
+      commitDataChange(); 
     };
 
     function checkPriceAlerts(symbol, currentPrice) {
@@ -1487,11 +1541,171 @@
           highlightTimeout = setTimeout(() => {
             currentHighlightedAlertId = null;
             renderAlerts();
-          }, 60000); // 1分鐘後熄滅光暈
+          }, 60000); 
         }
-        commitDataChange(); // 🔥 呼叫中央管理器
+        commitDataChange(); 
       }
     }
+
+    // --- 波段分析 (手動與智能) 邏輯 ---
+    window.calcVolManual = function() {
+      if(!els.volHighInput || !els.volLowInput || !els.volManualResult) return;
+      const h = parseFloat(els.volHighInput.value);
+      const l = parseFloat(els.volLowInput.value);
+      if (!isNaN(h) && !isNaN(l) && h > 0 && l > 0 && h >= l) {
+          els.volManualResult.classList.remove('hidden');
+          const drop = ((h - l) / h) * 100;
+          const rise = ((h - l) / l) * 100;
+          els.volManualDrop.textContent = `-${formatNumber(drop)}%`;
+          els.volManualRise.textContent = `+${formatNumber(rise)}%`;
+      } else {
+          els.volManualResult.classList.add('hidden');
+      }
+    };
+
+    if(els.volHighInput) els.volHighInput.addEventListener('input', calcVolManual);
+    if(els.volLowInput) els.volLowInput.addEventListener('input', calcVolManual);
+
+    window.analyzeVolatility = async function(mode) {
+      if(!els.tickerInput) return;
+      const symbol = els.tickerInput.value.toUpperCase().trim();
+      if (!symbol) return showToast('請先在上方輸入或抓取股票代號', 'error');
+
+      const btn = mode === 'today' ? els.btnAnalyzeVolToday : els.btnAnalyzeVol30D;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '分析中...';
+      btn.disabled = true;
+
+      const source = els.dataSourceSelect ? els.dataSourceSelect.value : 'finnhub';
+
+      try {
+          let drops = [];
+          let prices = [];
+
+          if (source === 'finnhub') {
+              const to = Math.floor(Date.now() / 1000);
+              // 擴大搜索範圍到 4 天前，避免因為週末或連假導致 24 小時內沒有任何數據
+              const from = mode === 'today' ? to - (4 * 24 * 60 * 60) : to - (30 * 24 * 60 * 60);
+              // 1分K容易被免費版API限制，改為 5分K 較為穩定
+              const resolution = mode === 'today' ? '5' : 'D'; 
+              
+              const res = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`);
+              const data = await res.json();
+              if (data.s === 'ok' && data.c && data.c.length > 0) {
+                  if (mode === 'today') {
+                      // 取出最後一個交易日的日期字串
+                      const lastTimestamp = data.t[data.t.length - 1];
+                      const lastDate = new Date(lastTimestamp * 1000).toDateString();
+                      
+                      // 只篩選出最後一個交易日的所有價格
+                      for(let i = 0; i < data.t.length; i++) {
+                          if (new Date(data.t[i] * 1000).toDateString() === lastDate) {
+                              prices.push(data.c[i]);
+                          }
+                      }
+                      // 如果過濾後為空 (防呆)，則使用全部
+                      if (prices.length === 0) prices = data.c;
+                  } else {
+                      prices = data.c;
+                      for (let i = 0; i < data.h.length; i++) {
+                          const h = data.h[i], l = data.l[i];
+                          if (h > 0 && h > l) drops.push(((h - l) / h) * 100);
+                      }
+                  }
+              } else {
+                  throw new Error(data.s === 'no_data' ? '該時段無交易數據(可能為休市或API限制)' : '無法取得該代號歷史資料');
+              }
+          } else {
+              const interval = mode === 'today' ? '5min' : '1day';
+              const outputsize = mode === 'today' ? 390 : 30; 
+              const res = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=${outputsize}&apikey=${TWELVE_DATA_API_KEY}`);
+              const data = await res.json();
+              if (data.values && data.values.length > 0) {
+                  const sortedValues = data.values.reverse();
+                  
+                  if (mode === 'today') {
+                      // 取出最後一天的日期 (格式為 YYYY-MM-DD)
+                      const lastDateStr = sortedValues[sortedValues.length - 1].datetime.split(' ')[0];
+                      const todayValues = sortedValues.filter(v => v.datetime.startsWith(lastDateStr));
+                      prices = todayValues.map(v => parseFloat(v.close));
+                  } else {
+                      prices = sortedValues.map(v => parseFloat(v.close));
+                      for (let i = 0; i < sortedValues.length; i++) {
+                          const h = parseFloat(sortedValues[i].high);
+                          const l = parseFloat(sortedValues[i].low);
+                          if (h > 0 && h > l) drops.push(((h - l) / h) * 100);
+                      }
+                  }
+              } else {
+                  throw new Error(data.message || '無法取得全市場歷史資料');
+              }
+          }
+
+          // 針對「當日波動」使用 V 型轉折演算法
+          if (mode === 'today' && prices.length > 0) {
+              const threshold = 0.001; 
+              let state = 'up';
+              let peak = prices[0];
+              let trough = prices[0];
+
+              for (let i = 1; i < prices.length; i++) {
+                  const p = prices[i];
+                  if (state === 'up') {
+                      if (p > peak) {
+                          peak = p;
+                      } else if ((peak - p) / peak > threshold) {
+                          state = 'down';
+                          trough = p;
+                      }
+                  } else if (state === 'down') {
+                      if (p < trough) {
+                          trough = p;
+                      } else if ((p - trough) / trough > threshold) {
+                          state = 'up';
+                          drops.push((peak - trough) / peak * 100);
+                          peak = p;
+                      }
+                  }
+              }
+              // 收尾：如果最後還在跌勢中且有一定跌幅，也算進去
+              if (state === 'down' && peak > trough && ((peak - trough) / peak > threshold)) {
+                  drops.push((peak - trough) / peak * 100);
+              }
+          }
+
+          if (drops.length > 0) {
+              const maxDrop = Math.max(...drops);
+              const minDrop = Math.min(...drops);
+              const avgDrop = drops.reduce((a, b) => a + b, 0) / drops.length;
+              const avgRebound = (avgDrop / (100 - avgDrop)) * 100;
+
+              els.volMaxDrop.textContent = `-${formatNumber(maxDrop, 2)}%`;
+              els.volMinDrop.textContent = `-${formatNumber(minDrop, 2)}%`;
+              els.volAvgDrop.textContent = `-${formatNumber(avgDrop, 2)}%`;
+              els.volAvgRebound.textContent = `+${formatNumber(avgRebound, 2)}%`;
+              
+              if (els.volatilityResultTitle) {
+                  els.volatilityResultTitle.textContent = mode === 'today' ? '--- 當日內震盪分析 (多次V型回撤) ---' : '--- 近 30 日波動分析 (單日最大震盪) ---';
+                  els.volatilityResultTitle.classList.remove('hidden');
+              }
+
+              els.volatilityResult.classList.remove('hidden');
+              showToast(mode === 'today' ? '✅ 當日波動分析完成' : '✅ 近30日分析完成', 'success');
+          } else {
+              showToast('資料波動過小，無法找出明顯的轉折段', 'error');
+              els.volatilityResult.classList.add('hidden');
+              if (els.volatilityResultTitle) els.volatilityResultTitle.classList.add('hidden');
+          }
+      } catch (e) {
+          showToast('分析失敗: ' + e.message, 'error');
+      } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      }
+    };
+
+    if(els.btnAnalyzeVolToday) els.btnAnalyzeVolToday.addEventListener('click', () => analyzeVolatility('today'));
+    if(els.btnAnalyzeVol30D) els.btnAnalyzeVol30D.addEventListener('click', () => analyzeVolatility('30d'));
 
     // --- 頁籤切換與日曆報表邏輯 ---
     window.switchRecordsTab = function(tab) {
@@ -1513,6 +1727,19 @@
       if(tab === 'details') renderDetails();
     };
 
+    window.switchTab = function(tabId) {
+      ['target', 'single', 'alert', 'volatility'].forEach(t => {
+        const active = t === tabId;
+        const tabEl = document.getElementById(`tab-${t}`);
+        if(tabEl) tabEl.classList.toggle('hidden', !active);
+        const btn = document.getElementById(`btn-tab-${t}`);
+        if(btn) {
+            btn.className = active ? 'flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md bg-[#2979ff] text-white font-bold transition-all flex items-center justify-center gap-1' 
+                                   : 'flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all flex items-center justify-center gap-1';
+        }
+      });
+    }
+
     function renderReport() {
       if (!els.reportView || els.reportView.classList.contains('hidden')) return;
 
@@ -1522,8 +1749,9 @@
 
       const currency = els.reportCurrencySelect ? els.reportCurrencySelect.value : 'USD';
       const multiplier = currency === 'MOP' ? 8 : 1; 
-      if (els.reportCurrencyLabel) els.reportCurrencyLabel.textContent = currency;
-      if (els.reportYearCurrencyLabel) els.reportYearCurrencyLabel.textContent = currency;
+      if (els.reportCurrencyLabelMonth) els.reportCurrencyLabelMonth.textContent = currency;
+      if (els.reportCurrencyLabelYear) els.reportCurrencyLabelYear.textContent = currency;
+      if (els.reportCurrencyLabelGrand) els.reportCurrencyLabelGrand.textContent = currency;
 
       const daysInMonth = new Date(year, month, 0).getDate();
       const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
@@ -1531,6 +1759,7 @@
       const dailyProfit = {};
       let monthlyTotal = 0;
       let yearlyTotal = 0;
+      let grandTotal = 0;
 
       tradeHistory.forEach(r => {
         const sPrice = parseFloat(r.sellPrice);
@@ -1544,11 +1773,12 @@
           recordDate = ts ? new Date(ts) : new Date();
         }
 
+        const fee = parseFloat(r.fee) || 0;
+        const pnl = (sPrice - r.price) * r.quantity - fee;
+        
+        grandTotal += pnl;
+
         if (recordDate.getFullYear() === year) {
-          const fee = parseFloat(r.fee) || 0;
-          // 恢復成原本統一的 (賣出 - 買入) 算法
-          const pnl = (sPrice - r.price) * r.quantity - fee;
-          
           yearlyTotal += pnl;
 
           if (recordDate.getMonth() + 1 === month) {
@@ -1569,12 +1799,14 @@
 
       for (let d = 1; d <= daysInMonth; d++) {
         let profit = dailyProfit[d];
-        let bgClass = 'bg-[#2a2a2a]';
-        let textClass = 'text-slate-500';
-        let profitStr = '0.00';
-
         const cellDate = new Date(year, month - 1, d);
+        const dayOfWeek = cellDate.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
         const isFuture = cellDate > today;
+
+        let bgClass = isWeekend ? 'bg-[#151515] border border-[#333]/30 opacity-70' : 'bg-[#2a2a2a]';
+        let textClass = isWeekend ? 'text-slate-600' : 'text-slate-500';
+        let profitStr = '0.00';
 
         if (profit !== undefined && profit !== 0) {
           profit = profit * multiplier; 
@@ -1594,7 +1826,7 @@
         }
 
         gridHtml += `
-          <div class="flex flex-col items-center justify-center p-0.5 md:p-1 min-h-[50px] md:min-h-[75px] rounded ${bgClass} overflow-hidden">
+          <div class="flex flex-col items-center justify-center p-0.5 md:p-1 min-h-[50px] md:min-h-[75px] rounded ${bgClass} overflow-hidden transition-all duration-300">
             <span class="text-[11px] md:text-[15px] font-bold text-slate-200 ${profitStr ? 'mb-0.5 md:mb-1' : ''}">${d}</span>
             ${profitStr ? `<span class="text-[7.5px] sm:text-[9px] md:text-[13px] font-bold tracking-tighter whitespace-nowrap w-full text-center ${textClass} leading-none">${profitStr}</span>` : ''}
           </div>
@@ -1603,14 +1835,20 @@
 
       els.reportCalendarGrid.innerHTML = gridHtml;
       
-      const displayTotal = monthlyTotal * multiplier; 
-      els.reportMonthTotal.textContent = (displayTotal > 0 ? '+' : '') + formatNumber(displayTotal);
-      els.reportMonthTotal.className = `text-3xl font-bold tracking-tight ${displayTotal >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`;
+      const displayMonthTotal = monthlyTotal * multiplier; 
+      els.reportMonthTotal.textContent = (displayMonthTotal > 0 ? '+' : '') + formatNumber(displayMonthTotal);
+      els.reportMonthTotal.className = `text-lg md:text-xl font-bold tracking-tight ${displayMonthTotal >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`;
 
       const displayYearTotal = yearlyTotal * multiplier;
       if (els.reportYearTotal) {
         els.reportYearTotal.textContent = (displayYearTotal > 0 ? '+' : '') + formatNumber(displayYearTotal);
-        els.reportYearTotal.className = `text-xl md:text-2xl font-bold tracking-tight ${displayYearTotal >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`;
+        els.reportYearTotal.className = `text-lg md:text-xl font-bold tracking-tight ${displayYearTotal >= 0 ? 'text-[#2979ff]' : 'text-[#ff9100]'}`;
+      }
+
+      const displayGrandTotal = grandTotal * multiplier;
+      if (els.reportGrandTotal) {
+        els.reportGrandTotal.textContent = (displayGrandTotal > 0 ? '+' : '') + formatNumber(displayGrandTotal);
+        els.reportGrandTotal.className = `text-lg md:text-xl font-bold tracking-tight ${displayGrandTotal >= 0 ? 'text-[#d946ef]' : 'text-[#f43f5e]'}`;
       }
     }
 
@@ -1642,7 +1880,6 @@
       const now = new Date();
       if (els.detailsUpdateTime) els.detailsUpdateTime.textContent = now.toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}) + ' ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
-      // 按代號統整所有平倉損益
       const aggregated = {};
       tradeHistory.forEach(r => {
         const sPrice = parseFloat(r.sellPrice);
@@ -1650,14 +1887,12 @@
 
         const fee = parseFloat(r.fee) || 0;
         
-        // 修正：取消多空反轉，統一恢復使用 (賣出價 - 買入價) * 數量 - 手續費 
         const pnl = (sPrice - r.price) * r.quantity - fee;
 
         if (!aggregated[r.ticker]) aggregated[r.ticker] = 0;
         aggregated[r.ticker] += pnl;
       });
 
-      // 分為盈利與虧損兩組
       const profitList = [];
       const lossList = [];
       for (const ticker in aggregated) {
@@ -1665,7 +1900,6 @@
         else if (aggregated[ticker] < 0) lossList.push({ ticker, pnl: aggregated[ticker] });
       }
 
-      // 盈利由高到低，虧損由低到高(最慘的在上面)
       profitList.sort((a, b) => b.pnl - a.pnl);
       lossList.sort((a, b) => a.pnl - b.pnl);
 
@@ -1682,15 +1916,13 @@
         const colorClass = item.pnl > 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
         const sign = item.pnl > 0 ? '+' : '';
         
-        // 判斷市場標籤 (簡單邏輯：包含 . 的如 .TW 顯示出來，沒有的預設 US)
         let marketTag = 'US';
         if (item.ticker.includes('.')) {
           marketTag = item.ticker.split('.')[1].toUpperCase();
         } else if (item.ticker.length === 4 && !isNaN(item.ticker)) {
-          marketTag = 'HK'; // 簡易判斷港股
+          marketTag = 'HK';
         }
 
-        // 排行榜標章顏色設計 (確保全部都有排名)
         let badgeHtml = '';
         if (index === 0) badgeHtml = `<span class="inline-flex shrink-0 items-center justify-center w-5 h-5 rounded bg-[#e05b38] text-white text-[11px] font-bold mr-3 shadow-md">${index + 1}</span>`;
         else if (index === 1) badgeHtml = `<span class="inline-flex shrink-0 items-center justify-center w-5 h-5 rounded bg-[#e89050] text-white text-[11px] font-bold mr-3 shadow-md">${index + 1}</span>`;
@@ -1718,19 +1950,6 @@
       els.detailsCurrencySelect.addEventListener('change', renderDetails);
     }
 
-    window.switchTab = function(tabId) {
-      ['target', 'single', 'alert'].forEach(t => {
-        const active = t === tabId;
-        const tabEl = document.getElementById(`tab-${t}`);
-        if(tabEl) tabEl.classList.toggle('hidden', !active);
-        const btn = document.getElementById(`btn-tab-${t}`);
-        if(btn) {
-            btn.className = active ? 'flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md bg-[#2979ff] text-white font-bold transition-all flex items-center justify-center gap-1' 
-                                   : 'flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all flex items-center justify-center gap-1';
-        }
-      });
-    }
-
     // --- 報價來源與 API 邏輯 ---
     if(els.dataSourceSelect) {
       els.dataSourceSelect.addEventListener('change', (e) => {
@@ -1745,7 +1964,7 @@
             }
           }
         }
-        saveUIStateLocal(); // UI 狀態不觸發雲端上傳
+        saveUIStateLocal(); 
       });
     }
 
@@ -1762,12 +1981,12 @@
         "locale": "zh_TW",
         "backgroundColor": "#0F0F0F",
         "gridColor": "rgba(242, 242, 242, 0.06)",
-        "hide_side_toolbar": false, // 💡 解鎖左側專業繪圖工具列，允許手動畫線
+        "hide_side_toolbar": false,
         "allow_symbol_change": false,
         "container_id": "tvchart",
         "studies": [
-          "MASimple@tv-basicstudies", // 💡 自動畫出 SMA 移動平均線 (數學趨勢線)
-          "MACD@tv-basicstudies"      // 💡 自動畫出 MACD 底部動能指標
+          "MASimple@tv-basicstudies",
+          "MACD@tv-basicstudies"
         ],
       });
       currentChartSymbol = symbol;
@@ -1785,14 +2004,10 @@
       if (!els.lastUpdateTime) return;
       let dateObj;
       if (unixTimestamp) {
-        // 如果有提供來源時間戳 (Finnhub 給的是秒，需乘 1000 轉為毫秒)
         dateObj = new Date(unixTimestamp * 1000);
       } else {
-        // 備用：若數據源未提供時間 (如 TwelveData 簡易版)，則使用當前時間
         dateObj = new Date();
       }
-      
-      // 強制轉換並格式化為澳門時間 (Asia/Macau)
       const timeStr = dateObj.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Macau', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
       els.lastUpdateTime.textContent = `澳門時間 ${timeStr}`;
     }
@@ -1818,11 +2033,10 @@
           if (data && data.c) { 
             if(els.currentPriceDisp) els.currentPriceDisp.value = data.c; 
             updateCurrentPriceColor(); checkPriceAlerts(symbol, data.c); 
-            saveUIStateLocal(); // UI 狀態不觸發雲端上傳
+            saveUIStateLocal();
             updateLastFetchTime(data.t);
           }
         } else {
-          // Twelve Data API 邏輯
           const res = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${TWELVE_DATA_API_KEY}`);
           const data = await res.json();
           if (data.code === 429) return showToast('Twelve Data 頻率達免費上限 (每分鐘8次)', 'error');
@@ -1832,7 +2046,7 @@
             const price = parseFloat(data.price);
             if(els.currentPriceDisp) els.currentPriceDisp.value = price;
             updateCurrentPriceColor(); checkPriceAlerts(symbol, price); 
-            saveUIStateLocal(); // UI 狀態不觸發雲端上傳
+            saveUIStateLocal();
             updateLastFetchTime();
           } else {
              showToast('無法取得該代號之全市場報價', 'error');
@@ -1918,7 +2132,6 @@
     if(els.tickerInput) els.tickerInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fetchStockData(); }});
 
     function saveUIStateLocal() {
-      // 介面與跳動數據：僅存本地，不消耗雲端流量，不觸發 Firebase 上傳
       localStorage.setItem('stockCalcLocalUI_PRO', JSON.stringify({
         currentPrice: els.currentPriceDisp ? els.currentPriceDisp.value : '',
         autoRefresh: els.autoRefreshCheckbox ? els.autoRefreshCheckbox.checked : false, 
@@ -2056,27 +2269,34 @@
         if (tradeHistory.length > 200) tradeHistory.pop();
         els.priceInput.value = ''; els.qtyInput.value = ''; 
         
-        commitDataChange(); // 🔥 呼叫中央管理器：更新、存檔並上傳
-        
+        commitDataChange(); 
         showToast('紀錄已新增', 'success');
       });
     }
 
     window.deleteRecord = (id) => { 
-      records = records.filter(r => r.id !== id); 
-      commitDataChange(); // 🔥 呼叫中央管理器
+      showModal({
+        type: 'confirm',
+        title: '🗑️ 刪除當前倉位',
+        text: '確定要移除此筆當前倉位紀錄嗎？',
+        onConfirm: () => {
+          records = records.filter(r => r.id !== id); 
+          commitDataChange(); 
+          showToast('🗑️ 倉位已刪除', 'info');
+        }
+      });
     };
     
     window.deleteHistoryRecord = (id) => { 
       tradeHistory = tradeHistory.filter(r => r.id !== id); 
-      commitDataChange(); // 🔥 呼叫中央管理器
+      commitDataChange(); 
     };
     
     window.updateHistoryTrade = function(id, field, value) {
       const record = tradeHistory.find(r => r.id === id);
       if (record) {
-        record[field] = value;
-        commitDataChange(); // 🔥 呼叫中央管理器
+        record[field] = value === '' ? null : parseFloat(value);
+        commitDataChange(); 
       }
     };
 
@@ -2089,7 +2309,6 @@
       
       if(!els.recordsTableBody) return;
       
-      // 加入清空後的無紀錄提示
       if (records.length === 0) {
         els.recordsTableBody.innerHTML = '<tr><td colspan="6" class="px-1.5 py-4 md:px-6 md:py-8 text-center text-slate-500 text-[10px] md:text-sm">尚無任何當前倉位</td></tr>';
         return;
@@ -2102,7 +2321,6 @@
         const isShort = r.direction === 'short';
         const dirHtml = isShort ? '<span class="text-[#ff5252] bg-[#ff5252]/10 px-1 py-0.5 rounded text-[8px] md:text-[9px] ml-1">空</span>' : '<span class="text-[#00e676] bg-[#00e676]/10 px-1 py-0.5 rounded text-[8px] md:text-[9px] ml-1">多</span>';
         
-        // 取消紅方框，改用純文字+光暈呼吸燈特效
         const newBadge = index === 0 ? '<span class="ml-1 md:ml-2 text-[#ff5252] text-[8px] md:text-[9px] font-black italic tracking-wider animate-pulse drop-shadow-[0_0_5px_rgba(255,82,82,0.8)]">NEW</span>' : '';
         
         if (!isNaN(currentPrice)) {
@@ -2136,7 +2354,6 @@
       if(els.historyCount) els.historyCount.textContent = filteredHistory.length;
       
       if(els.historyTableBody) {
-        // 加入清空後的無紀錄提示與搜尋不到的提示
         if (filteredHistory.length === 0) {
           els.historyTableBody.innerHTML = `<tr><td colspan="8" class="px-1.5 py-4 md:px-6 md:py-8 text-center text-slate-500 text-[10px] md:text-sm">${query ? '找不到符合「' + query + '」的紀錄' : '尚無歷史交易紀錄'}</td></tr>`;
           return;
@@ -2146,7 +2363,6 @@
         let htmlStr = '';
 
         filteredHistory.forEach((r, index) => {
-          // 解析這筆紀錄的月份
           let recordDate;
           if (r.dateStr) {
             recordDate = new Date(r.dateStr);
@@ -2156,7 +2372,6 @@
           }
           const monthStr = `${recordDate.getFullYear()} 年 ${recordDate.getMonth() + 1} 月`;
 
-          // 如果遇到新的月份，就插入一條分隔橫幅
           if (monthStr !== currentMonthStr) {
             htmlStr += `
               <tr class="bg-[#2a2a2a]/80">
@@ -2171,7 +2386,6 @@
           const isShort = r.direction === 'short';
           const dirHtml = isShort ? '<span class="text-[#ff5252] bg-[#ff5252]/10 px-1 py-0.5 rounded text-[8px] md:text-[9px] ml-1">空</span>' : '<span class="text-[#00e676] bg-[#00e676]/10 px-1 py-0.5 rounded text-[8px] md:text-[9px] ml-1">多</span>';
           
-          // 為歷史紀錄的第一筆也加上無框光暈 NEW
           const newBadge = index === 0 ? '<span class="ml-1 md:ml-2 text-[#ff5252] text-[8px] md:text-[9px] font-black italic tracking-wider animate-pulse drop-shadow-[0_0_5px_rgba(255,82,82,0.8)]">NEW</span>' : '';
           
           if (!isNaN(sPrice)) {
@@ -2194,10 +2408,10 @@
             <td class="px-1.5 md:px-4 py-1.5 md:py-3 whitespace-nowrap">${formatNumber(r.quantity)}</td>
             <td class="px-1.5 md:px-4 py-1.5 md:py-3 text-slate-300 whitespace-nowrap">$${formatNumber(r.price, 4)}</td>
             <td class="px-1 md:px-2 py-1 md:py-2 text-center">
-              <input type="number" step="any" placeholder="-" value="${r.sellPrice !== undefined ? r.sellPrice : ''}" onchange="updateHistoryTrade('${r.id}', 'sellPrice', this.value)" class="w-12 md:w-16 px-1 md:px-1.5 py-0.5 md:py-1 text-[10px] md:text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入賣出價">
+              <input type="number" step="any" placeholder="-" value="${r.sellPrice != null ? r.sellPrice : ''}" onchange="updateHistoryTrade('${r.id}', 'sellPrice', this.value)" class="w-12 md:w-16 px-1 md:px-1.5 py-0.5 md:py-1 text-[10px] md:text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入賣出價">
             </td>
             <td class="px-1 md:px-2 py-1 md:py-2 text-center">
-              <input type="number" step="any" placeholder="-" value="${r.fee !== undefined ? r.fee : ''}" onchange="updateHistoryTrade('${r.id}', 'fee', this.value)" class="w-10 md:w-14 px-1 md:px-1.5 py-0.5 md:py-1 text-[10px] md:text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入手續費">
+              <input type="number" step="any" placeholder="-" value="${r.fee != null ? r.fee : ''}" onchange="updateHistoryTrade('${r.id}', 'fee', this.value)" class="w-10 md:w-14 px-1 md:px-1.5 py-0.5 md:py-1 text-[10px] md:text-xs bg-[#1e1e1e] border border-[#444] rounded text-white outline-none focus:border-[#2979ff] hover:border-[#666] transition-colors text-center" title="輸入手續費">
             </td>
             <td class="px-1.5 md:px-4 py-1.5 md:py-3 whitespace-nowrap">${pnlHtml}</td>
             <td class="px-1.5 md:px-4 py-1.5 md:py-3 text-right whitespace-nowrap">
