@@ -647,7 +647,9 @@
        updateSyncStatus('syncing');
        if (unsubscribeSnapshot) unsubscribeSnapshot();
 
-       const docRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'calculatorData', 'state');
+       // 🔥 已更改：使用 Public 共用路徑，不需要登入綁定也不需要手動輸入同步碼
+       // 任何使用此網址打開的使用者，讀寫的都是這一個 "globalState"
+       const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'shared', 'globalState');
        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
            if (docSnap.exists()) {
                const data = docSnap.data();
@@ -655,9 +657,8 @@
                // 1. 防回音機制
                if (data.updatedAt && data.updatedAt <= cloudSyncTimestamp) return;
 
-               // 2. 🔥 新增：本地時間戳防禦機制
+               // 2. 本地時間戳防禦機制
                const localSavedTime = parseInt(localStorage.getItem('stockCalcLastLocalUpdate_PRO') || '0');
-               // 如果本地資料比雲端新超過 5 秒，代表有離線編輯未上傳，強制反推雲端
                if (localSavedTime > (data.updatedAt + 5000)) {
                    console.log("偵測到本地資料較新，執行反向同步至雲端...");
                    pushDataToCloud();
@@ -750,12 +751,16 @@
            updatedAt: cloudSyncTimestamp
        };
        
-       const docRef = doc(db, 'artifacts', appIdStr, 'users', currentUser.uid, 'calculatorData', 'state');
+       // 🔥 已更改：使用 Public 共用路徑
+       const docRef = doc(db, 'artifacts', appIdStr, 'public', 'data', 'shared', 'globalState');
        setDoc(docRef, stateToSave)
            .then(() => updateSyncStatus('synced'))
            .catch((e) => {
                console.error("Sync error", e);
                updateSyncStatus('error');
+               if(e.code === 'permission-denied') {
+                  showToast('權限不足，請更新 Firebase Rules', 'error');
+               }
            });
     };
 
