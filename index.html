@@ -370,7 +370,7 @@
               <div>
                 <label class="block text-[11px] font-bold text-slate-200 mb-1">目標漲跌幅</label>
                 <div class="relative flex items-center">
-                  <input id="singlePctInput" type="number" step="any" class="w-full pl-3 pr-7 py-1.5 text-sm font-bold rounded-lg border border-[#444]">
+                  <input id="singlePctInput" type="number" step="any" class="w-full pl-3 pr-7 py-1.5 text-sm font-bold rounded-lg border border-[#444] ">
                   <span class="absolute right-2.5 text-slate-400 text-sm font-bold pointer-events-none">%</span>
                 </div>
               </div>
@@ -556,15 +556,15 @@
             <span id="avgPriceDisp" class="text-xs sm:text-sm md:text-xl font-bold text-white leading-none mt-0 md:mt-0.5">0</span>
           </div>
           <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center">
-            <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">總持股數</span>
+            <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">當前總持股</span>
             <span id="totalSharesDisp" class="text-xs sm:text-sm md:text-xl font-bold text-[#2979ff] leading-none mt-0 md:mt-0.5">0</span>
           </div>
           <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center">
-            <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">總投入成本</span>
+            <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">當前總成本</span>
             <span id="totalCostDisp" class="text-xs sm:text-sm md:text-xl font-bold text-white leading-none mt-0 md:mt-0.5">0</span>
           </div>
           <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center">
-            <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">倉位盈虧</span>
+            <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">倉位總盈虧</span>
             <div class="flex flex-col items-start justify-center mt-0 md:mt-0.5">
               <span id="currentPnlAmountDisp" class="text-xs sm:text-sm md:text-xl font-bold text-slate-600 leading-none">-</span>
               <span id="currentPnlPercentDisp" class="text-[8px] md:text-[10px] font-bold text-slate-600 leading-none mt-0.5 md:mt-1">-</span>
@@ -615,7 +615,7 @@
                   <th class="px-1.5 py-1.5 md:px-6 md:py-3 font-bold uppercase tracking-wider text-[9px] md:text-xs whitespace-nowrap">數量</th>
                   <th class="px-1.5 py-1.5 md:px-6 md:py-3 font-bold uppercase tracking-wider text-[9px] md:text-xs whitespace-nowrap">價位</th>
                   <th class="px-1.5 py-1.5 md:px-6 md:py-3 font-bold uppercase tracking-wider text-[9px] md:text-xs whitespace-nowrap">小計</th>
-                  <th class="px-1.5 py-1.5 md:px-6 md:py-3 font-bold uppercase tracking-wider text-[9px] md:text-xs whitespace-nowrap">倉位盈虧</th>
+                  <th class="px-1.5 py-1.5 md:px-6 md:py-3 font-bold uppercase tracking-wider text-[9px] md:text-xs whitespace-nowrap">即時盈虧</th>
                   <th class="px-1.5 py-1.5 md:px-6 md:py-3 text-right text-[9px] md:text-xs whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
@@ -896,24 +896,56 @@
        });
     }
 
+    // 🌟 全新重構：嚴格限定在「當前搜尋的股票代碼」下計算看板資訊，解決多股混算與空單計算錯誤問題
+    function updateDashboard() {
+        const currentSym = els.tickerInput ? els.tickerInput.value.toUpperCase().trim() : '';
+        const v = els.currentPriceDisp ? parseFloat(els.currentPriceDisp.value) : NaN;
+
+        // 只篩選出符合目前上方輸入框代號的倉位紀錄
+        const activeRecords = currentSym ? records.filter(r => r.ticker === currentSym) : [];
+        
+        let symShares = 0, symCost = 0;
+        activeRecords.forEach(r => { 
+            symShares += r.quantity; 
+            symCost += r.cost; 
+        });
+        const symAvgPrice = symShares > 0 ? symCost / symShares : 0;
+
+        if(els.totalSharesDisp) els.totalSharesDisp.textContent = formatNumber(symShares);
+        if(els.totalCostDisp) els.totalCostDisp.textContent = formatNumber(symCost);
+        if(els.avgPriceDisp) els.avgPriceDisp.textContent = formatNumber(symAvgPrice, 4);
+
+        const dis = symShares === 0;
+        if(els.targetPriceInput) els.targetPriceInput.disabled = dis;
+        if(els.percentInput) els.percentInput.disabled = dis;
+        if(els.expectedPnlInput) els.expectedPnlInput.disabled = dis;
+
+        if (!isNaN(v) && symShares > 0) {
+            const c = (symAvgPrice > 0 && v > symAvgPrice) ? '#00e676' : (symAvgPrice > 0 && v < symAvgPrice) ? '#ff5252' : '#fff';
+            if (els.currentPriceDisp) els.currentPriceDisp.style.color = c;
+
+            let totalPnl = 0;
+            activeRecords.forEach(r => {
+                const isShort = r.direction === 'short';
+                // 🌟 修復做空時的盈虧算法 (如果是空單，買入價減去現價才是獲利)
+                const diff = isShort ? (r.price - v) : (v - r.price);
+                totalPnl += diff * r.quantity;
+            });
+            const color = totalPnl >= 0 ? '#00e676' : '#ff5252';
+            if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber(totalPnl); }
+            if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%'; }
+        } else {
+            if(els.currentPriceDisp) els.currentPriceDisp.style.color = '#fff';
+            if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = '#718096'; els.currentPnlAmountDisp.textContent = '-'; }
+            if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = '#718096'; els.currentPnlPercentDisp.textContent = '-'; }
+        }
+
+        // 連動觸發預期試算的重新計算
+        calculatePnl(activeRecords, symAvgPrice, symCost); 
+    }
+
     window.commitDataChange = function(isFromCloud = false) {
-      // 在寫入儲存之前，確保所有歷史紀錄的日期與UI顯示同步
-      if (tradeHistory && tradeHistory.length > 0) {
-          syncDateStrWithTime(tradeHistory);
-      }
-
-      totalShares = records.reduce((s, r) => s + r.quantity, 0);
-      totalCost = records.reduce((s, r) => s + r.cost, 0);
-      averagePrice = totalShares > 0 ? totalCost / totalShares : 0;
-
-      if(els.totalSharesDisp) els.totalSharesDisp.textContent = formatNumber(totalShares);
-      if(els.totalCostDisp) els.totalCostDisp.textContent = formatNumber(totalCost);
-      if(els.avgPriceDisp) els.avgPriceDisp.textContent = formatNumber(averagePrice, 4);
-
-      const dis = totalShares === 0;
-      if(els.targetPriceInput) els.targetPriceInput.disabled = dis;
-      if(els.percentInput) els.percentInput.disabled = dis;
-      if(els.expectedPnlInput) els.expectedPnlInput.disabled = dis;
+      if (tradeHistory && tradeHistory.length > 0) syncDateStrWithTime(tradeHistory);
 
       localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({records, ticker: els.tickerInput ? els.tickerInput.value : ''}));
       localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(tradeHistory));
@@ -924,10 +956,9 @@
           localStorage.setItem('stockCalcLastLocalUpdate_PRO', Date.now().toString());
       }
 
-      calculatePnl();
-      updateCurrentPriceColor(false); 
+      // 使用重構後的動態更新函數
+      updateDashboard();
 
-      // 🚀 效能優化：只渲染「當前正在看」的那個分頁，隱藏的分頁不消耗效能
       if (activeRecordsTab === 'current') renderTable();
       else if (activeRecordsTab === 'history') renderHistoryTable();
       else if (activeRecordsTab === 'report') renderReport();
@@ -936,9 +967,7 @@
       renderAlerts();
       renderTickerDropdown();
 
-      if (!isFromCloud) {
-          pushDataToCloud();
-      }
+      if (!isFromCloud) pushDataToCloud();
     };
 
     window.pushDataToCloud = function() {
@@ -993,7 +1022,6 @@
     let activeRecordsTab = 'current';
     let activeDetailsFilter = 'profit'; 
     
-    let averagePrice = 0, totalShares = 0, totalCost = 0;
     let activeTargetMode = 'price'; 
     let quoteInterval = null, currentChartSymbol = ''; 
     let currentChartInterval = localStorage.getItem(STORAGE_KEY_INTERVAL) || 'D';
@@ -1272,7 +1300,6 @@
               try {
                 const importedObj = JSON.parse(evt.target.result);
                 
-                // 1. 動態熱重載：直接寫入當前記憶體變數，不再重新整理網頁
                 if (importedObj.state) {
                   const stateData = JSON.parse(importedObj.state);
                   records = stateData.records || [];
@@ -1282,7 +1309,6 @@
                 if (importedObj.tickers) savedTickers = JSON.parse(importedObj.tickers);
                 if (importedObj.alerts) priceAlerts = JSON.parse(importedObj.alerts);
                 
-                // 2. 更新設定與 API keys
                 if (importedObj.interval) {
                   currentChartInterval = importedObj.interval;
                   if(els.chartIntervalSelect) els.chartIntervalSelect.value = currentChartInterval;
@@ -1312,7 +1338,6 @@
                 }
                 updateSoundUI();
                 
-                // 3. 強制觸發存檔與推送到雲端，強行覆蓋雲端的舊資料
                 commitDataChange(false);
                 
                 showToast('🚀 資料已成功導入並同步至雲端！', 'success');
@@ -1765,7 +1790,7 @@
               sendBrowserNotification('🚨 價位觸發！', msg);
               playAlertSound();
               if (a.type === 'once') {
-                a._markedForDeletion = true; // 🚀 效能優化：標記為準備刪除，節省資料庫空間
+                a._markedForDeletion = true; 
               } else {
                 a.isTriggered = true; 
               }
@@ -1779,7 +1804,7 @@
               sendBrowserNotification('📉 價位觸發！', msg);
               playAlertSound();
               if (a.type === 'once') {
-                a._markedForDeletion = true; // 🚀 效能優化：標記為準備刪除
+                a._markedForDeletion = true; 
               } else {
                 a.isTriggered = true;
               }
@@ -1796,7 +1821,6 @@
       });
       
       if (needsUpdate) {
-        // 🚀 執行刪除已失效的單次提醒
         priceAlerts = priceAlerts.filter(a => !a._markedForDeletion);
         
         if (triggeredAlertId) {
@@ -1868,7 +1892,7 @@
               let from, to;
               if (mode === 'today') {
                   to = Math.floor(Date.now() / 1000);
-                  from = to - (4 * 24 * 60 * 60); // 增加到取過去 4 天資料，確保跨越週末
+                  from = to - (4 * 24 * 60 * 60); 
               } else {
                   from = Math.floor(new Date(startDate).getTime() / 1000);
                   to = Math.floor(new Date(endDate + "T23:59:59").getTime() / 1000);
@@ -1879,7 +1903,6 @@
               if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得該區間資料');
 
               if (mode === 'today') {
-                  // 使用 4 小時 (14400秒) 的時間間距，精準切割出最新的交易日，不受時區影響
                   let startIndex = 0;
                   for (let i = data.t.length - 1; i > 0; i--) {
                       if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
@@ -1899,7 +1922,6 @@
                   }
               }
           } else {
-              // TwelveData
               const interval = mode === 'today' ? '5min' : '1day';
               let url = '';
               if (mode === 'today') {
@@ -1917,7 +1939,6 @@
               if (data.values && data.values.length > 0) {
                   const sortedValues = data.values.reverse();
                   if (mode === 'today') {
-                      // 同樣使用 4 小時 (14400000 毫秒) 間隔切割，確保跨時區時不會切斷單日交易
                       let startIndex = 0;
                       for (let i = sortedValues.length - 1; i > 0; i--) {
                           const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
@@ -1942,7 +1963,6 @@
               }
           }
 
-          // 共同的價格波段計算邏輯 (針對 today 單日)
           if (mode === 'today' && prices.length > 0) {
               const threshold = 0.001; 
               let state = 'up';
@@ -2024,11 +2044,8 @@
     if(els.btnAnalyzeVolToday) els.btnAnalyzeVolToday.addEventListener('click', () => analyzeVolatility('today'));
     if(els.btnAnalyzeVolRange) els.btnAnalyzeVolRange.addEventListener('click', () => analyzeVolatility('range'));
 
-    // 全新：精準 1分K 分析 (整合來源，解決免費版延遲問題，並加入成交動能分析)
     window.analyzeCandlesRatio = async function() {
-      // 依要求固定使用 RKLB 進行分析
       const symbol = 'RKLB';
-
       const btn = els.btnAnalyzeCandles1Min;
       const originalText = btn.innerHTML;
       btn.innerHTML = '分析中...';
@@ -2041,14 +2058,13 @@
 
           if (source === 'finnhub') {
               const to = Math.floor(Date.now() / 1000);
-              const from = to - (4 * 24 * 60 * 60); // 延長範圍，取過去 4 天資料以跨越週末
+              const from = to - (4 * 24 * 60 * 60); 
               const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=1&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
               const res = await fetch(url);
               const data = await res.json();
               
               if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得歷史K線，請確認代碼');
               
-              // 使用 4 小時 (14400秒) 的時間間隔來精準切割最新交易時段，解決時區落差導致的天數誤判
               let startIndex = 0;
               for (let i = data.t.length - 1; i > 0; i--) {
                   if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
@@ -2063,7 +2079,6 @@
                   else { flatCount++; flatVol += v; }
               }
           } else {
-              // Twelve Data (注意：免費版對美股可能延遲至昨日)
               const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1min&outputsize=1000&apikey=${TWELVE_DATA_API_KEY}`;
               const res = await fetch(url);
               const data = await res.json();
@@ -2074,7 +2089,6 @@
               
               const sortedValues = data.values.reverse();
               
-              // 同樣使用 4 小時的毫秒數 (14400000ms) 判斷交易日斷層
               let startIndex = 0;
               for (let i = sortedValues.length - 1; i > 0; i--) {
                   const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
@@ -2094,11 +2108,9 @@
               });
           }
 
-          // --- 計算與 UI 渲染 ---
           const totalCount = upCount + downCount + flatCount;
           if (totalCount === 0) throw new Error('計算結果無有效 K 線');
 
-          // 數量比例
           const upPct = (upCount / totalCount) * 100;
           const downPct = (downCount / totalCount) * 100;
           const flatPct = (flatCount / totalCount) * 100;
@@ -2115,7 +2127,6 @@
           els.candleFlatPct.textContent = `${flatPct.toFixed(1)}%`;
           els.candleBarFlat.style.width = `${flatPct}%`;
 
-          // 成交量動能比例
           const totalVol = upVol + downVol + flatVol;
           if (totalVol > 0) {
               const volUpPct = (upVol / totalVol) * 100;
@@ -2174,7 +2185,6 @@
       
       if(els.historyActions) els.historyActions.classList.toggle('hidden', tab !== 'history');
 
-      // 🚀 效能優化：切換到該分頁時，才執行重繪
       if(tab === 'current') renderTable();
       if(tab === 'history') renderHistoryTable();
       if(tab === 'report') renderReport();
@@ -2487,7 +2497,8 @@
           const data = await res.json();
           if (data && data.c) { 
             if(els.currentPriceDisp) els.currentPriceDisp.value = data.c; 
-            updateCurrentPriceColor(true); 
+            updateDashboard(); 
+            if (activeRecordsTab === 'current') renderTable();
             checkPriceAlerts(symbol, data.c); 
             saveUIStateLocal();
             updateLastFetchTime(data.t);
@@ -2501,7 +2512,8 @@
           if (data && data.price) {
             const price = parseFloat(data.price);
             if(els.currentPriceDisp) els.currentPriceDisp.value = price;
-            updateCurrentPriceColor(true); 
+            updateDashboard(); 
+            if (activeRecordsTab === 'current') renderTable();
             checkPriceAlerts(symbol, price); 
             saveUIStateLocal();
             updateLastFetchTime();
@@ -2534,7 +2546,8 @@
           if (data && data.c) { 
             if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== data.c) {
               els.currentPriceDisp.value = data.c; 
-              updateCurrentPriceColor(true); 
+              updateDashboard();
+              if (activeRecordsTab === 'current') renderTable();
               checkPriceAlerts(symbol, data.c);
             }
             updateLastFetchTime(data.t);
@@ -2552,7 +2565,8 @@
               const price = parseFloat(data.price);
               if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== price) {
                 els.currentPriceDisp.value = price; 
-                updateCurrentPriceColor(true); 
+                updateDashboard();
+                if (activeRecordsTab === 'current') renderTable();
                 checkPriceAlerts(symbol, price);
               }
               updateLastFetchTime();
@@ -2601,34 +2615,41 @@
       }));
     }
 
-    if(els.targetPriceInput) els.targetPriceInput.addEventListener('input', () => { activeTargetMode = 'price'; calculatePnl(); });
-    if(els.percentInput) els.percentInput.addEventListener('input', () => { activeTargetMode = 'percent'; calculatePnl(); });
-    if(els.expectedPnlInput) els.expectedPnlInput.addEventListener('input', () => { activeTargetMode = 'pnl'; calculatePnl(); });
+    if(els.targetPriceInput) els.targetPriceInput.addEventListener('input', () => { activeTargetMode = 'price'; updateDashboard(); });
+    if(els.percentInput) els.percentInput.addEventListener('input', () => { activeTargetMode = 'percent'; updateDashboard(); });
+    if(els.expectedPnlInput) els.expectedPnlInput.addEventListener('input', () => { activeTargetMode = 'pnl'; updateDashboard(); });
 
-    function calculatePnl() {
+    // 🌟 全新重構的強大 PnL 算法：解決代數推算與做空反向問題
+    function calculatePnl(activeRecords, symAvgPrice, symCost) {
       if(!els.pnlResult) return;
-      if (totalShares === 0 || averagePrice <= 0) { els.pnlResult.classList.add('hidden'); return; }
+      if (!activeRecords || activeRecords.length === 0 || symAvgPrice <= 0) { 
+          els.pnlResult.classList.add('hidden'); 
+          return; 
+      }
       els.pnlResult.classList.remove('hidden');
       let html = '';
+
       if (activeTargetMode === 'price' && els.targetPriceInput) {
         const val = parseFloat(els.targetPriceInput.value);
         if (!isNaN(val)) {
           let p = 0;
-          records.forEach(r => {
-             p += (val - r.price) * r.quantity;
+          activeRecords.forEach(r => {
+             const isShort = r.direction === 'short';
+             p += (isShort ? r.price - val : val - r.price) * r.quantity;
           });
-          const pct = (p / totalCost) * 100;
+          const pct = (p / symCost) * 100;
           const color = p >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
           html = `<div class="p-3 rounded-xl bg-[#2a2a2a] border border-[#444]"><div class="flex justify-between items-center mb-1"><span class="text-slate-200 font-medium">預估總損益</span><span class="font-bold text-sm ${color}">${p >= 0 ? '+' : ''}${formatNumber(p)}</span></div><div class="flex justify-between items-center"><span class="text-slate-200 font-medium">總報酬率</span><span class="font-bold text-sm ${color}">${pct >= 0 ? '+' : ''}${formatNumber(pct)}%</span></div></div>`;
         }
       } else if (activeTargetMode === 'percent' && els.percentInput) {
         let val = Math.abs(parseFloat(els.percentInput.value));
         if (!isNaN(val)) {
-          const upP = averagePrice * (1 + val/100), dwP = averagePrice * (1 - val/100);
+          const upP = symAvgPrice * (1 + val/100), dwP = symAvgPrice * (1 - val/100);
           let upPn = 0, dwPn = 0;
-          records.forEach(r => {
-             upPn += (upP - r.price) * r.quantity;
-             dwPn += (dwP - r.price) * r.quantity;
+          activeRecords.forEach(r => {
+             const isShort = r.direction === 'short';
+             upPn += (isShort ? r.price - upP : upP - r.price) * r.quantity;
+             dwPn += (isShort ? r.price - dwP : dwP - r.price) * r.quantity;
           });
           html = `
             <div class="p-2.5 rounded-xl bg-[#00e676]/10 border border-[#00e676]/30 text-[11px]">
@@ -2643,19 +2664,31 @@
       } else if (activeTargetMode === 'pnl' && els.expectedPnlInput) {
         let val = Math.abs(parseFloat(els.expectedPnlInput.value));
         if (!isNaN(val)) {
-          const netQty = records.reduce((acc, r) => acc + r.quantity, 0);
-          if (netQty === 0) {
-             html = `<div class="p-2.5 rounded-xl bg-slate-800 text-center text-xs text-slate-400">數量已抵銷</div>`;
+          let netDelta = 0;
+          let costLong = 0, costShort = 0;
+          
+          activeRecords.forEach(r => {
+             if (r.direction === 'short') {
+                 netDelta -= r.quantity;
+                 costShort += r.cost;
+             } else {
+                 netDelta += r.quantity;
+                 costLong += r.cost;
+             }
+          });
+
+          if (netDelta === 0) {
+             html = `<div class="p-2.5 rounded-xl bg-slate-800 text-center text-xs text-slate-400">多空倉位數量完全抵銷，無法試算目標價</div>`;
           } else {
-             const valPerShare = val / Math.abs(netQty);
-             const upP = averagePrice + valPerShare;
-             const dwP = averagePrice - valPerShare;
+             const targetProfit = (val + costLong - costShort) / netDelta;
+             const targetLoss = (-val + costLong - costShort) / netDelta;
+             
              html = `
                <div class="p-2.5 rounded-xl bg-[#00e676]/10 border border-[#00e676]/30 text-[11px]">
-                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標獲利 +${formatNumber(val)}</span><span class="font-bold text-sm text-[#00e676]">${formatNumber(netQty > 0 ? upP : dwP, 4)}</span></div>
+                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標獲利 +${formatNumber(val)}</span><span class="font-bold text-sm text-[#00e676]">${formatNumber(targetProfit > 0 ? targetProfit : 0, 4)}</span></div>
                </div>
                <div class="p-2.5 rounded-xl bg-[#ff5252]/10 border border-[#ff5252]/30 text-[11px] mt-2">
-                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標虧損 -${formatNumber(val)}</span><span class="font-bold text-sm text-[#ff5252]">${formatNumber(netQty > 0 ? dwP : upP, 4)}</span></div>
+                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標虧損 -${formatNumber(val)}</span><span class="font-bold text-sm text-[#ff5252]">${formatNumber(targetLoss > 0 ? targetLoss : 0, 4)}</span></div>
                </div>`;
           }
         }
@@ -2705,42 +2738,16 @@
     if(els.singleCostInput) els.singleCostInput.addEventListener('input', () => calculateSingleTrade());
     if(els.singleQtyInput) els.singleQtyInput.addEventListener('input', () => calculateSingleTrade());
 
-    function updateCurrentPriceColor(shouldRenderTable = true) {
-      if(!els.currentPriceDisp) return;
-      const v = parseFloat(els.currentPriceDisp.value);
-      if (isNaN(v)) { 
-        if(els.currentPnlAmountDisp) els.currentPnlAmountDisp.textContent = '-'; 
-        if(els.currentPnlPercentDisp) els.currentPnlPercentDisp.textContent = '-'; 
-        if (shouldRenderTable && activeRecordsTab === 'current') renderTable(); 
-        return; 
-      }
-      const c = (averagePrice > 0 && v > averagePrice) ? '#00e676' : (averagePrice > 0 && v < averagePrice) ? '#ff5252' : '#fff';
-      els.currentPriceDisp.style.color = c;
-      if (totalShares > 0) {
-        let totalPnl = 0;
-        records.forEach(r => {
-           totalPnl += (v - r.price) * r.quantity;
-        });
-        const color = totalPnl >= 0 ? '#00e676' : '#ff5252';
-        if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber(totalPnl); }
-        if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/totalCost)*100) + '%'; }
-      } else {
-        if(els.currentPnlAmountDisp) els.currentPnlAmountDisp.textContent = '-'; 
-        if(els.currentPnlPercentDisp) els.currentPnlPercentDisp.textContent = '-'; 
-      }
-      if (shouldRenderTable && activeRecordsTab === 'current') renderTable(); 
-    }
-
-    if(els.currentPriceDisp) els.currentPriceDisp.addEventListener('input', () => updateCurrentPriceColor(true));
-
     function updatePreviewAvgCost() {
       if(!els.qtyInput || !els.priceInput || !els.previewAvgCostContainer || !els.previewAvgCost) return;
       const q = parseFloat(els.qtyInput.value);
       const p = parseFloat(els.priceInput.value);
+      const currentSym = els.tickerInput ? els.tickerInput.value.toUpperCase().trim() : '';
       
-      if (!isNaN(q) && q > 0 && !isNaN(p) && p > 0) {
-        const currentTotalShares = records.reduce((s, r) => s + r.quantity, 0);
-        const currentTotalCost = records.reduce((s, r) => s + r.cost, 0);
+      if (!isNaN(q) && q > 0 && !isNaN(p) && p > 0 && currentSym) {
+        const activeRecords = records.filter(r => r.ticker === currentSym);
+        const currentTotalShares = activeRecords.reduce((s, r) => s + r.quantity, 0);
+        const currentTotalCost = activeRecords.reduce((s, r) => s + r.cost, 0);
         
         const newTotalShares = currentTotalShares + q;
         const newTotalCost = currentTotalCost + (p * q);
@@ -2838,6 +2845,10 @@
     }
 
     function renderTable() {
+      // 🌟 修正：當前倉位列表的「現價即時盈虧」不再被其他股票跨股污染
+      const currentSym = els.tickerInput ? els.tickerInput.value.toUpperCase().trim() : '';
+      const currentPrice = els.currentPriceDisp ? parseFloat(els.currentPriceDisp.value) : NaN;
+
       if(els.currentCount) els.currentCount.textContent = records.length;
       
       if(!els.recordsTableBody) return;
@@ -2847,8 +2858,6 @@
         return;
       }
 
-      const currentPrice = els.currentPriceDisp ? parseFloat(els.currentPriceDisp.value) : NaN;
-      
       els.recordsTableBody.innerHTML = records.map((r, index) => {
         let pnlHtml = '<td class="px-1.5 py-1.5 md:px-6 md:py-3 text-slate-500 text-[10px] md:text-sm">-</td>';
         const isShort = r.direction === 'short';
@@ -2856,7 +2865,8 @@
         
         const newBadge = index === 0 ? '<span class="ml-1 md:ml-2 text-[#ff5252] text-[8px] md:text-[9px] font-black italic tracking-wider animate-pulse drop-shadow-[0_0_5px_rgba(255,82,82,0.8)]">NEW</span>' : '';
         
-        if (!isNaN(currentPrice)) {
+        // 嚴格判定：只有當前選擇的代碼才能吃到「現價」的即時盈虧顯示！
+        if (!isNaN(currentPrice) && r.ticker === currentSym) {
           const rowPnl = (isShort ? (r.price - currentPrice) : (currentPrice - r.price)) * r.quantity;
           const rowPnlPct = ((isShort ? (r.price - currentPrice) : (currentPrice - r.price)) / r.price) * 100;
           const color = rowPnl >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
@@ -2880,6 +2890,7 @@
       }).join('');
     }
 
+    // ... 下方的程式碼無需更動，完整保留
     function renderHistoryTable() {
       const query = els.historySearchInput ? els.historySearchInput.value.toUpperCase().trim() : '';
       const filteredHistory = query ? tradeHistory.filter(r => r.ticker.includes(query)) : tradeHistory;
@@ -2895,7 +2906,6 @@
         let currentMonthStr = '';
         let htmlStr = '';
 
-        // 🚀 效能與記憶體優化：DOM 渲染截斷 (避免歷史紀錄過多時卡頓)
         const maxRenderLimit = 50; 
         const displayHistory = filteredHistory.slice(0, maxRenderLimit);
 
@@ -2960,7 +2970,6 @@
           </tr>`;
         });
         
-        // 如果歷史紀錄超過顯示上限，在表格底部加上提示
         if (filteredHistory.length > maxRenderLimit) {
            htmlStr += `
             <tr>
