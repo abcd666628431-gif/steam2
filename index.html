@@ -397,7 +397,7 @@
                   📉 分析當日波動 (5分K)
               </button>
               <button type="button" id="btnAnalyzeCandles1Min" class="w-full bg-[#2a2a2a] hover:bg-[#333] border border-[#d946ef]/50 text-[#d946ef] text-[11px] font-bold py-1.5 rounded-lg transition-colors">
-                  📊 分析當日 1分K 升跌柱比例
+                  📊 分析當日 1分K 升跌柱與動能
               </button>
               <div class="flex items-center bg-[#2a2a2a] border border-[#2979ff]/50 rounded-lg overflow-hidden transition-colors hover:bg-[#333]">
                 <input type="date" id="volStartDate" class="flex-1 bg-transparent text-white text-center font-bold outline-none text-[10px] py-1.5 px-0.5 border-r border-[#2979ff]/50 min-w-0" title="開始日期" />
@@ -444,29 +444,51 @@
               </div>
             </div>
 
-            <div id="candleRatioResult" class="hidden mt-3 space-y-2">
-              <div class="text-[10px] text-center text-slate-400 font-bold tracking-widest">--- 當日 1分K 柱狀比例 ---</div>
-              <div class="grid grid-cols-3 gap-2">
-                <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center">
-                  <span class="text-[9px] text-slate-400 font-bold mb-0.5">升柱 (多)</span>
-                  <span id="candleUpCount" class="text-sm font-bold text-[#00e676]">-</span>
-                  <span id="candleUpPct" class="text-[9px] text-[#00e676] opacity-80">-</span>
+            <div id="candleRatioResult" class="hidden mt-3 space-y-3">
+              <!-- 柱狀數量統計 -->
+              <div class="space-y-1.5">
+                <div class="text-[10px] text-center text-slate-400 font-bold tracking-widest">--- 1分K 升跌柱數量比例 ---</div>
+                <div class="grid grid-cols-3 gap-2">
+                  <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center">
+                    <span class="text-[9px] text-slate-400 font-bold mb-0.5">升柱 (多)</span>
+                    <span id="candleUpCount" class="text-sm font-bold text-[#00e676]">-</span>
+                    <span id="candleUpPct" class="text-[9px] text-[#00e676] opacity-80">-</span>
+                  </div>
+                  <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center">
+                    <span class="text-[9px] text-slate-400 font-bold mb-0.5">平盤 (十字)</span>
+                    <span id="candleFlatCount" class="text-sm font-bold text-slate-300">-</span>
+                    <span id="candleFlatPct" class="text-[9px] text-slate-300 opacity-80">-</span>
+                  </div>
+                  <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center">
+                    <span class="text-[9px] text-slate-400 font-bold mb-0.5">跌柱 (空)</span>
+                    <span id="candleDownCount" class="text-sm font-bold text-[#ff5252]">-</span>
+                    <span id="candleDownPct" class="text-[9px] text-[#ff5252] opacity-80">-</span>
+                  </div>
                 </div>
-                <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center">
-                  <span class="text-[9px] text-slate-400 font-bold mb-0.5">平盤 (十字)</span>
-                  <span id="candleFlatCount" class="text-sm font-bold text-slate-300">-</span>
-                  <span id="candleFlatPct" class="text-[9px] text-slate-300 opacity-80">-</span>
-                </div>
-                <div class="bg-[#1e1e1e] border border-[#444] rounded-lg p-1.5 flex flex-col items-center">
-                  <span class="text-[9px] text-slate-400 font-bold mb-0.5">跌柱 (空)</span>
-                  <span id="candleDownCount" class="text-sm font-bold text-[#ff5252]">-</span>
-                  <span id="candleDownPct" class="text-[9px] text-[#ff5252] opacity-80">-</span>
+                <div class="w-full h-1.5 rounded-full overflow-hidden flex bg-slate-800 border border-[#333]">
+                  <div id="candleBarUp" class="h-full bg-[#00e676] transition-all duration-1000" style="width: 0%"></div>
+                  <div id="candleBarFlat" class="h-full bg-slate-400 transition-all duration-1000" style="width: 0%"></div>
+                  <div id="candleBarDown" class="h-full bg-[#ff5252] transition-all duration-1000" style="width: 0%"></div>
                 </div>
               </div>
-              <div class="w-full h-1.5 rounded-full overflow-hidden flex bg-slate-800 border border-[#333]">
-                <div id="candleBarUp" class="h-full bg-[#00e676] transition-all duration-1000" style="width: 0%"></div>
-                <div id="candleBarFlat" class="h-full bg-slate-400 transition-all duration-1000" style="width: 0%"></div>
-                <div id="candleBarDown" class="h-full bg-[#ff5252] transition-all duration-1000" style="width: 0%"></div>
+
+              <!-- 買賣盤成交量動能統計 -->
+              <div class="pt-2 border-t border-[#444] space-y-1.5">
+                <div class="flex justify-between items-center text-[9px] text-slate-400 font-bold px-1">
+                  <span>買盤動能 (多)</span>
+                  <span>淨流向 / 總量</span>
+                  <span>賣盤動能 (空)</span>
+                </div>
+                <div class="flex justify-between items-end px-1">
+                  <span id="candleVolUp" class="text-xs font-bold text-[#00e676]">-</span>
+                  <span id="candleVolNet" class="text-[10px] font-bold px-1.5 py-0.5 rounded">-</span>
+                  <span id="candleVolDown" class="text-xs font-bold text-[#ff5252]">-</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full overflow-hidden flex bg-slate-800 border border-[#333]">
+                  <div id="candleVolBarUp" class="h-full bg-[#00e676] transition-all duration-1000" style="width: 0%"></div>
+                  <div id="candleVolBarFlat" class="h-full bg-slate-400 transition-all duration-1000" style="width: 0%"></div>
+                  <div id="candleVolBarDown" class="h-full bg-[#ff5252] transition-all duration-1000" style="width: 0%"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -1027,6 +1049,12 @@
       candleBarUp: document.getElementById('candleBarUp'),
       candleBarFlat: document.getElementById('candleBarFlat'),
       candleBarDown: document.getElementById('candleBarDown'),
+      candleVolUp: document.getElementById('candleVolUp'),
+      candleVolNet: document.getElementById('candleVolNet'),
+      candleVolDown: document.getElementById('candleVolDown'),
+      candleVolBarUp: document.getElementById('candleVolBarUp'),
+      candleVolBarFlat: document.getElementById('candleVolBarFlat'),
+      candleVolBarDown: document.getElementById('candleVolBarDown'),
 
       // Display
       currentPriceDisp: document.getElementById('currentPriceDisp'),
@@ -1383,6 +1411,12 @@
     function formatNumber(num, decimals = 2) {
       return new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num);
     }
+    
+    function formatVol(num) {
+      if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+      return num.toFixed(0);
+    }
 
     // --- 音效設定區塊 ---
     const defaultSoundUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
@@ -1731,32 +1765,37 @@
           let rises = [];
           let prices = [];
 
-          const interval = mode === 'today' ? '5min' : '1day';
-          let url = '';
-          if (mode === 'today') {
-              url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=390&apikey=${TWELVE_DATA_API_KEY}`;
-          } else {
-              url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&start_date=${startDate}&end_date=${endDate} 23:59:59&apikey=${TWELVE_DATA_API_KEY}`;
-          }
-          
-          const res = await fetch(url);
-          const data = await res.json();
-          
-          if (data.code === 429) throw new Error('Twelve Data 頻率達免費上限');
-          if (data.code === 401) throw new Error('Twelve Data API Key 無效');
-          
-          if (data.values && data.values.length > 0) {
-              const sortedValues = data.values.reverse();
-              
+          const source = els.dataSourceSelect ? els.dataSourceSelect.value : 'finnhub';
+
+          if (source === 'finnhub') {
+              const resolution = mode === 'today' ? '5' : 'D';
+              let from, to;
               if (mode === 'today') {
-                  const lastDateStr = sortedValues[sortedValues.length - 1].datetime.split(' ')[0];
-                  const todayValues = sortedValues.filter(v => v.datetime.startsWith(lastDateStr));
-                  prices = todayValues.map(v => parseFloat(v.close));
+                  to = Math.floor(Date.now() / 1000);
+                  from = to - (4 * 24 * 60 * 60); // 增加到取過去 4 天資料，確保跨越週末
               } else {
-                  prices = sortedValues.map(v => parseFloat(v.close));
-                  for (let i = 0; i < sortedValues.length; i++) {
-                      const h = parseFloat(sortedValues[i].high);
-                      const l = parseFloat(sortedValues[i].low);
+                  from = Math.floor(new Date(startDate).getTime() / 1000);
+                  to = Math.floor(new Date(endDate + "T23:59:59").getTime() / 1000);
+              }
+              const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
+              const res = await fetch(url);
+              const data = await res.json();
+              if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得該區間資料');
+
+              if (mode === 'today') {
+                  // 使用 4 小時 (14400秒) 的時間間距，精準切割出最新的交易日，不受時區影響
+                  let startIndex = 0;
+                  for (let i = data.t.length - 1; i > 0; i--) {
+                      if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
+                  }
+                  for (let i = startIndex; i < data.t.length; i++) {
+                      prices.push(data.c[i]);
+                  }
+              } else {
+                  prices = data.c;
+                  for (let i = 0; i < data.h.length; i++) {
+                      const h = data.h[i];
+                      const l = data.l[i];
                       if (h > 0 && h > l) {
                           drops.push(((h - l) / h) * 100);
                           rises.push(((h - l) / l) * 100);
@@ -1764,9 +1803,50 @@
                   }
               }
           } else {
-              throw new Error(data.message || '該區間無法取得歷史資料');
+              // TwelveData
+              const interval = mode === 'today' ? '5min' : '1day';
+              let url = '';
+              if (mode === 'today') {
+                  url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=390&apikey=${TWELVE_DATA_API_KEY}`;
+              } else {
+                  url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&start_date=${startDate}&end_date=${endDate} 23:59:59&apikey=${TWELVE_DATA_API_KEY}`;
+              }
+              
+              const res = await fetch(url);
+              const data = await res.json();
+              
+              if (data.code === 429) throw new Error('Twelve Data 頻率達免費上限');
+              if (data.code === 401) throw new Error('Twelve Data API Key 無效');
+              
+              if (data.values && data.values.length > 0) {
+                  const sortedValues = data.values.reverse();
+                  if (mode === 'today') {
+                      // 同樣使用 4 小時 (14400000 毫秒) 間隔切割，確保跨時區時不會切斷單日交易
+                      let startIndex = 0;
+                      for (let i = sortedValues.length - 1; i > 0; i--) {
+                          const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
+                          const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
+                          if (currTime - prevTime > 14400000) { startIndex = i; break; }
+                      }
+                      const todayValues = sortedValues.slice(startIndex);
+                      prices = todayValues.map(v => parseFloat(v.close));
+                  } else {
+                      prices = sortedValues.map(v => parseFloat(v.close));
+                      for (let i = 0; i < sortedValues.length; i++) {
+                          const h = parseFloat(sortedValues[i].high);
+                          const l = parseFloat(sortedValues[i].low);
+                          if (h > 0 && h > l) {
+                              drops.push(((h - l) / h) * 100);
+                              rises.push(((h - l) / l) * 100);
+                          }
+                      }
+                  }
+              } else {
+                  throw new Error(data.message || '該區間無法取得歷史資料');
+              }
           }
 
+          // 共同的價格波段計算邏輯 (針對 today 單日)
           if (mode === 'today' && prices.length > 0) {
               const threshold = 0.001; 
               let state = 'up';
@@ -1848,10 +1928,10 @@
     if(els.btnAnalyzeVolToday) els.btnAnalyzeVolToday.addEventListener('click', () => analyzeVolatility('today'));
     if(els.btnAnalyzeVolRange) els.btnAnalyzeVolRange.addEventListener('click', () => analyzeVolatility('range'));
 
+    // 全新：精準 1分K 分析 (整合來源，解決免費版延遲問題，並加入成交動能分析)
     window.analyzeCandlesRatio = async function() {
-      if(!els.tickerInput) return;
-      const symbol = els.tickerInput.value.toUpperCase().trim();
-      if (!symbol) return showToast('請先在上方輸入或抓取股票代號', 'error');
+      // 依要求固定使用 RKLB 進行分析
+      const symbol = 'RKLB';
 
       const btn = els.btnAnalyzeCandles1Min;
       const originalText = btn.innerHTML;
@@ -1859,51 +1939,119 @@
       btn.disabled = true;
 
       try {
-          const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1min&outputsize=500&apikey=${TWELVE_DATA_API_KEY}`;
-          const res = await fetch(url);
-          const data = await res.json();
-          
-          if (data.code === 429) throw new Error('Twelve Data 頻率達免費上限');
-          if (data.code === 401) throw new Error('Twelve Data API Key 無效');
-          
-          if (data.values && data.values.length > 0) {
-              const sortedValues = data.values.reverse();
-              const lastDateStr = sortedValues[sortedValues.length - 1].datetime.split(' ')[0];
-              const todayValues = sortedValues.filter(v => v.datetime.startsWith(lastDateStr));
+          const source = els.dataSourceSelect ? els.dataSourceSelect.value : 'finnhub';
+          let upCount = 0, downCount = 0, flatCount = 0;
+          let upVol = 0, downVol = 0, flatVol = 0;
+
+          if (source === 'finnhub') {
+              const to = Math.floor(Date.now() / 1000);
+              const from = to - (4 * 24 * 60 * 60); // 延長範圍，取過去 4 天資料以跨越週末
+              const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=1&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
+              const res = await fetch(url);
+              const data = await res.json();
               
-              let upCount = 0, downCount = 0, flatCount = 0;
+              if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得歷史K線，請確認代碼');
+              
+              // 使用 4 小時 (14400秒) 的時間間隔來精準切割最新交易時段，解決時區落差導致的天數誤判
+              let startIndex = 0;
+              for (let i = data.t.length - 1; i > 0; i--) {
+                  if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
+              }
+              
+              for (let i = startIndex; i < data.t.length; i++) {
+                  const o = data.o[i];
+                  const c = data.c[i];
+                  const v = data.v[i] || 0;
+                  if (c > o) { upCount++; upVol += v; }
+                  else if (c < o) { downCount++; downVol += v; }
+                  else { flatCount++; flatVol += v; }
+              }
+          } else {
+              // Twelve Data (注意：免費版對美股可能延遲至昨日)
+              const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1min&outputsize=1000&apikey=${TWELVE_DATA_API_KEY}`;
+              const res = await fetch(url);
+              const data = await res.json();
+              
+              if (data.code === 429) throw new Error('Twelve Data 頻率達免費上限');
+              if (data.code === 401) throw new Error('Twelve Data API Key 無效');
+              if (!data.values || data.values.length === 0) throw new Error('無法取得歷史資料');
+              
+              const sortedValues = data.values.reverse();
+              
+              // 同樣使用 4 小時的毫秒數 (14400000ms) 判斷交易日斷層
+              let startIndex = 0;
+              for (let i = sortedValues.length - 1; i > 0; i--) {
+                  const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
+                  const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
+                  if (currTime - prevTime > 14400000) { startIndex = i; break; }
+              }
+              
+              const todayValues = sortedValues.slice(startIndex);
+              
               todayValues.forEach(v => {
                   const o = parseFloat(v.open);
                   const c = parseFloat(v.close);
-                  if (c > o) upCount++;
-                  else if (c < o) downCount++;
-                  else flatCount++;
+                  const vol = parseFloat(v.volume || 0);
+                  if (c > o) { upCount++; upVol += vol; }
+                  else if (c < o) { downCount++; downVol += vol; }
+                  else { flatCount++; flatVol += vol; }
               });
-
-              const total = upCount + downCount + flatCount;
-              if (total === 0) throw new Error('無法計算，無有效 K 線資料');
-
-              const upPct = (upCount / total) * 100;
-              const downPct = (downCount / total) * 100;
-              const flatPct = (flatCount / total) * 100;
-
-              els.candleUpCount.textContent = upCount;
-              els.candleUpPct.textContent = `${upPct.toFixed(1)}%`;
-              els.candleBarUp.style.width = `${upPct}%`;
-
-              els.candleDownCount.textContent = downCount;
-              els.candleDownPct.textContent = `${downPct.toFixed(1)}%`;
-              els.candleBarDown.style.width = `${downPct}%`;
-
-              els.candleFlatCount.textContent = flatCount;
-              els.candleFlatPct.textContent = `${flatPct.toFixed(1)}%`;
-              els.candleBarFlat.style.width = `${flatPct}%`;
-
-              els.candleRatioResult.classList.remove('hidden');
-              showToast('✅ 1分K 升跌柱比例分析完成', 'success');
-          } else {
-              throw new Error(data.message || '無法取得歷史資料');
           }
+
+          // --- 計算與 UI 渲染 ---
+          const totalCount = upCount + downCount + flatCount;
+          if (totalCount === 0) throw new Error('計算結果無有效 K 線');
+
+          // 數量比例
+          const upPct = (upCount / totalCount) * 100;
+          const downPct = (downCount / totalCount) * 100;
+          const flatPct = (flatCount / totalCount) * 100;
+
+          els.candleUpCount.textContent = upCount;
+          els.candleUpPct.textContent = `${upPct.toFixed(1)}%`;
+          els.candleBarUp.style.width = `${upPct}%`;
+
+          els.candleDownCount.textContent = downCount;
+          els.candleDownPct.textContent = `${downPct.toFixed(1)}%`;
+          els.candleBarDown.style.width = `${downPct}%`;
+
+          els.candleFlatCount.textContent = flatCount;
+          els.candleFlatPct.textContent = `${flatPct.toFixed(1)}%`;
+          els.candleBarFlat.style.width = `${flatPct}%`;
+
+          // 成交量動能比例
+          const totalVol = upVol + downVol + flatVol;
+          if (totalVol > 0) {
+              const volUpPct = (upVol / totalVol) * 100;
+              const volDownPct = (downVol / totalVol) * 100;
+              const volFlatPct = (flatVol / totalVol) * 100;
+
+              els.candleVolUp.textContent = formatVol(upVol);
+              els.candleVolDown.textContent = formatVol(downVol);
+              
+              const netVol = upVol - downVol;
+              const netSign = netVol > 0 ? '+' : '';
+              const netColor = netVol > 0 ? 'text-[#00e676] bg-[#00e676]/10' : netVol < 0 ? 'text-[#ff5252] bg-[#ff5252]/10' : 'text-slate-400 bg-[#333]';
+              
+              els.candleVolNet.textContent = `${netSign}${formatVol(netVol)}`;
+              els.candleVolNet.className = `text-[10px] font-bold px-1.5 py-0.5 rounded ${netColor}`;
+
+              els.candleVolBarUp.style.width = `${volUpPct}%`;
+              els.candleVolBarDown.style.width = `${volDownPct}%`;
+              els.candleVolBarFlat.style.width = `${volFlatPct}%`;
+          } else {
+              els.candleVolUp.textContent = '-';
+              els.candleVolDown.textContent = '-';
+              els.candleVolNet.textContent = '-';
+              els.candleVolNet.className = `text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-400 bg-[#333]`;
+              els.candleVolBarUp.style.width = `0%`;
+              els.candleVolBarDown.style.width = `0%`;
+              els.candleVolBarFlat.style.width = `0%`;
+          }
+
+          els.candleRatioResult.classList.remove('hidden');
+          showToast(`✅ 1分K 升跌柱與動能分析完成 (${symbol})`, 'success');
+          
       } catch (e) {
           showToast('分析失敗: ' + e.message, 'error');
           els.candleRatioResult.classList.add('hidden');
