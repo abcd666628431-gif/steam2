@@ -310,9 +310,6 @@
                 <input id="priceInput" type="number" step="any" class="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-lg border border-[#444]" required>
               </div>
             </div>
-            <div id="previewAvgCostContainer" class="hidden text-[11px] text-slate-300 bg-[#2a2a2a] p-1.5 rounded-lg border border-[#444] text-center transition-all shadow-inner">
-              預計新平均成本: <span id="previewAvgCost" class="font-bold text-[#00e676] ml-1">-</span>
-            </div>
             <button type="submit" class="w-full bg-[#2979ff] hover:bg-[#1c54b2] text-white text-xs md:text-sm font-bold py-1.5 md:py-2 rounded-lg transition-colors shadow-lg">
               加入計算模型
             </button>
@@ -992,8 +989,6 @@
       qtyInput: document.getElementById('qtyInput'),
       priceInput: document.getElementById('priceInput'),
       addForm: document.getElementById('addForm'),
-      previewAvgCostContainer: document.getElementById('previewAvgCostContainer'),
-      previewAvgCost: document.getElementById('previewAvgCost'),
       
       // Calculators
       targetPriceInput: document.getElementById('targetPriceInput'),
@@ -2642,29 +2637,6 @@
 
     if(els.currentPriceDisp) els.currentPriceDisp.addEventListener('input', () => updateCurrentPriceColor(true));
 
-    function updatePreviewAvgCost() {
-      if(!els.qtyInput || !els.priceInput || !els.previewAvgCostContainer || !els.previewAvgCost) return;
-      const q = parseFloat(els.qtyInput.value);
-      const p = parseFloat(els.priceInput.value);
-      
-      if (!isNaN(q) && q > 0 && !isNaN(p) && p > 0) {
-        const currentTotalShares = records.reduce((s, r) => s + r.quantity, 0);
-        const currentTotalCost = records.reduce((s, r) => s + r.cost, 0);
-        
-        const newTotalShares = currentTotalShares + q;
-        const newTotalCost = currentTotalCost + (p * q);
-        const newAvg = newTotalShares > 0 ? newTotalCost / newTotalShares : 0;
-        
-        els.previewAvgCost.textContent = formatNumber(newAvg, 4);
-        els.previewAvgCostContainer.classList.remove('hidden');
-      } else {
-        els.previewAvgCostContainer.classList.add('hidden');
-      }
-    }
-
-    if(els.qtyInput) els.qtyInput.addEventListener('input', updatePreviewAvgCost);
-    if(els.priceInput) els.priceInput.addEventListener('input', updatePreviewAvgCost);
-
     if(els.addForm) {
       els.addForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -2690,7 +2662,6 @@
         
         if (tradeHistory.length > 200) tradeHistory.pop();
         els.priceInput.value = ''; els.qtyInput.value = ''; 
-        if(els.previewAvgCostContainer) els.previewAvgCostContainer.classList.add('hidden');
         
         commitDataChange(); 
         showToast('紀錄已新增', 'success');
