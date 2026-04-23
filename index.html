@@ -1885,36 +1885,37 @@
           let rises = [];
           let prices = [];
 
-          const source = els.dataSourceSelect ? els.dataSourceSelect.value : 'finnhub';
-
-          if (source === 'finnhub') {
-              const resolution = mode === 'today' ? '5' : 'D';
-              let from, to;
-              if (mode === 'today') {
-                  to = Math.floor(Date.now() / 1000);
-                  from = to - (4 * 24 * 60 * 60); 
-              } else {
-                  from = Math.floor(new Date(startDate).getTime() / 1000);
-                  to = Math.floor(new Date(endDate + "T23:59:59").getTime() / 1000);
-              }
-              const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
-              const res = await fetch(url);
-              const data = await res.json();
-              if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得該區間資料');
-
+          // 🌟 徹底剝離：強制波段分析固定使用 Twelve Data，不再跟隨上方報價設定
+          const interval = mode === 'today' ? '5min' : '1day';
+          let url = '';
+          if (mode === 'today') {
+              url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=390&apikey=${TWELVE_DATA_API_KEY}`;
+          } else {
+              url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&start_date=${startDate}&end_date=${endDate} 23:59:59&apikey=${TWELVE_DATA_API_KEY}`;
+          }
+          
+          const res = await fetch(url);
+          const data = await res.json();
+          
+          if (data.code === 429) throw new Error('TwelveData 免費額度已滿！(預設為共用Key，請點右上角更換專屬API Key)');
+          if (data.code === 401) throw new Error('Twelve Data API Key 無效');
+          
+          if (data.values && data.values.length > 0) {
+              const sortedValues = data.values.reverse();
               if (mode === 'today') {
                   let startIndex = 0;
-                  for (let i = data.t.length - 1; i > 0; i--) {
-                      if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
+                  for (let i = sortedValues.length - 1; i > 0; i--) {
+                      const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
+                      const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
+                      if (currTime - prevTime > 14400000) { startIndex = i; break; }
                   }
-                  for (let i = startIndex; i < data.t.length; i++) {
-                      prices.push(data.c[i]);
-                  }
+                  const todayValues = sortedValues.slice(startIndex);
+                  prices = todayValues.map(v => parseFloat(v.close));
               } else {
-                  prices = data.c;
-                  for (let i = 0; i < data.h.length; i++) {
-                      const h = data.h[i];
-                      const l = data.l[i];
+                  prices = sortedValues.map(v => parseFloat(v.close));
+                  for (let i = 0; i < sortedValues.length; i++) {
+                      const h = parseFloat(sortedValues[i].high);
+                      const l = parseFloat(sortedValues[i].low);
                       if (h > 0 && h > l) {
                           drops.push(((h - l) / h) * 100);
                           rises.push(((h - l) / l) * 100);
@@ -1922,45 +1923,7 @@
                   }
               }
           } else {
-              const interval = mode === 'today' ? '5min' : '1day';
-              let url = '';
-              if (mode === 'today') {
-                  url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=390&apikey=${TWELVE_DATA_API_KEY}`;
-              } else {
-                  url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&start_date=${startDate}&end_date=${endDate} 23:59:59&apikey=${TWELVE_DATA_API_KEY}`;
-              }
-              
-              const res = await fetch(url);
-              const data = await res.json();
-              
-              if (data.code === 429) throw new Error('Twelve Data 頻率達免費上限');
-              if (data.code === 401) throw new Error('Twelve Data API Key 無效');
-              
-              if (data.values && data.values.length > 0) {
-                  const sortedValues = data.values.reverse();
-                  if (mode === 'today') {
-                      let startIndex = 0;
-                      for (let i = sortedValues.length - 1; i > 0; i--) {
-                          const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
-                          const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
-                          if (currTime - prevTime > 14400000) { startIndex = i; break; }
-                      }
-                      const todayValues = sortedValues.slice(startIndex);
-                      prices = todayValues.map(v => parseFloat(v.close));
-                  } else {
-                      prices = sortedValues.map(v => parseFloat(v.close));
-                      for (let i = 0; i < sortedValues.length; i++) {
-                          const h = parseFloat(sortedValues[i].high);
-                          const l = parseFloat(sortedValues[i].low);
-                          if (h > 0 && h > l) {
-                              drops.push(((h - l) / h) * 100);
-                              rises.push(((h - l) / l) * 100);
-                          }
-                      }
-                  }
-              } else {
-                  throw new Error(data.message || '該區間無法取得歷史資料');
-              }
+              throw new Error(data.message || '該區間無法取得歷史資料');
           }
 
           if (mode === 'today' && prices.length > 0) {
@@ -2052,61 +2015,37 @@
       btn.disabled = true;
 
       try {
-          const source = els.dataSourceSelect ? els.dataSourceSelect.value : 'finnhub';
+          // 🌟 徹底剝離：1分K分析 強制固定使用 Twelve Data，不跟隨上方設定
           let upCount = 0, downCount = 0, flatCount = 0;
           let upVol = 0, downVol = 0, flatVol = 0;
 
-          if (source === 'finnhub') {
-              const to = Math.floor(Date.now() / 1000);
-              const from = to - (4 * 24 * 60 * 60); 
-              const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=1&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
-              const res = await fetch(url);
-              const data = await res.json();
-              
-              if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得歷史K線，請確認代碼');
-              
-              let startIndex = 0;
-              for (let i = data.t.length - 1; i > 0; i--) {
-                  if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
-              }
-              
-              for (let i = startIndex; i < data.t.length; i++) {
-                  const o = data.o[i];
-                  const c = data.c[i];
-                  const v = data.v[i] || 0;
-                  if (c > o) { upCount++; upVol += v; }
-                  else if (c < o) { downCount++; downVol += v; }
-                  else { flatCount++; flatVol += v; }
-              }
-          } else {
-              const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1min&outputsize=1000&apikey=${TWELVE_DATA_API_KEY}`;
-              const res = await fetch(url);
-              const data = await res.json();
-              
-              if (data.code === 429) throw new Error('Twelve Data 頻率達免費上限');
-              if (data.code === 401) throw new Error('Twelve Data API Key 無效');
-              if (!data.values || data.values.length === 0) throw new Error('無法取得歷史資料');
-              
-              const sortedValues = data.values.reverse();
-              
-              let startIndex = 0;
-              for (let i = sortedValues.length - 1; i > 0; i--) {
-                  const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
-                  const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
-                  if (currTime - prevTime > 14400000) { startIndex = i; break; }
-              }
-              
-              const todayValues = sortedValues.slice(startIndex);
-              
-              todayValues.forEach(v => {
-                  const o = parseFloat(v.open);
-                  const c = parseFloat(v.close);
-                  const vol = parseFloat(v.volume || 0);
-                  if (c > o) { upCount++; upVol += vol; }
-                  else if (c < o) { downCount++; downVol += vol; }
-                  else { flatCount++; flatVol += vol; }
-              });
+          const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1min&outputsize=1000&apikey=${TWELVE_DATA_API_KEY}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          
+          if (data.code === 429) throw new Error('TwelveData 免費額度已滿！(預設為共用Key，請點右上角更換專屬API Key)');
+          if (data.code === 401) throw new Error('Twelve Data API Key 無效');
+          if (!data.values || data.values.length === 0) throw new Error('無法取得歷史資料');
+          
+          const sortedValues = data.values.reverse();
+          
+          let startIndex = 0;
+          for (let i = sortedValues.length - 1; i > 0; i--) {
+              const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
+              const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
+              if (currTime - prevTime > 14400000) { startIndex = i; break; }
           }
+          
+          const todayValues = sortedValues.slice(startIndex);
+          
+          todayValues.forEach(v => {
+              const o = parseFloat(v.open);
+              const c = parseFloat(v.close);
+              const vol = parseFloat(v.volume || 0);
+              if (c > o) { upCount++; upVol += vol; }
+              else if (c < o) { downCount++; downVol += vol; }
+              else { flatCount++; flatVol += vol; }
+          });
 
           const totalCount = upCount + downCount + flatCount;
           if (totalCount === 0) throw new Error('計算結果無有效 K 線');
