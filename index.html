@@ -349,7 +349,7 @@
             <div id="pnlResult" class="hidden mt-2 space-y-2"></div>
           </div>
 
-          <!-- Tab: 單筆計算 (全新整合版) -->
+          <!-- Tab: 單筆計算 -->
           <div id="tab-single" class="hidden space-y-2 px-1 pb-1">
             <div class="grid grid-cols-2 gap-2">
               <div>
@@ -365,14 +365,14 @@
                 <input id="singleSellInput" type="number" step="any" class="w-full px-3 py-1.5 text-sm font-bold rounded-lg border border-[#444]">
               </div>
               <div>
-                <label class="block text-[11px] font-bold text-slate-200 mb-1">漲跌 / 盈虧幅</label>
+                <label class="block text-[11px] font-bold text-slate-200 mb-1">目標漲跌幅</label>
                 <div class="relative flex items-center">
                   <input id="singlePctInput" type="number" step="any" class="w-full pl-3 pr-7 py-1.5 text-sm font-bold rounded-lg border border-[#444]">
                   <span class="absolute right-2.5 text-slate-400 text-sm font-bold pointer-events-none">%</span>
                 </div>
               </div>
             </div>
-            <div id="singleResult" class="hidden mt-2 space-y-2"></div>
+            <div id="singleResult" class="hidden mt-2 p-2 rounded-lg border border-[#555] text-sm bg-[#2a2a2a]"></div>
           </div>
           
           <!-- Tab: 波段分析 (全新升級) -->
@@ -2313,76 +2313,45 @@
 
     let activeSingleMode = 'sell';
 
-    window.calculateSingleTrade = function(source) {
+    function calculateSingleTrade(source) {
       if(!els.singleCostInput || !els.singleSellInput || !els.singlePctInput || !els.singleQtyInput || !els.singleResult) return;
       
       if (source) activeSingleMode = source;
 
       const c = parseFloat(els.singleCostInput.value);
-      const s = parseFloat(els.singleSellInput.value);
-      const pct = parseFloat(els.singlePctInput.value);
+      let s = parseFloat(els.singleSellInput.value);
+      let pct = parseFloat(els.singlePctInput.value);
       const q = parseFloat(els.singleQtyInput.value);
 
-      if (isNaN(c) || c <= 0) {
+      if (isNaN(c)) {
          els.singleResult.classList.add('hidden');
          return;
       }
 
-      if (activeSingleMode === 'sell' && !isNaN(s)) {
-          els.singleResult.classList.remove('hidden');
-          const diffLong = s - c;
-          const diffShort = c - s;
-          const pctLong = (diffLong / c) * 100;
-          const pctShort = (diffShort / c) * 100;
-          const pnlLong = diffLong * (isNaN(q) ? 1 : q);
-          const pnlShort = diffShort * (isNaN(q) ? 1 : q);
-          
-          let html = renderSingleCard('作多 (Long)', s, diffLong, pnlLong, pctLong, q);
-          html += renderSingleCard('作空 (Short)', s, diffShort, pnlShort, pctShort, q, 'mt-2');
-          els.singleResult.innerHTML = html;
-          
-      } else if ((activeSingleMode === 'pct' || activeSingleMode === 'cost' || activeSingleMode === 'qty') && !isNaN(pct)) {
-          els.singleResult.classList.remove('hidden');
-          const absPct = Math.abs(pct);
-          const sUp = c * (1 + absPct / 100);
-          const sDown = c * (1 - absPct / 100);
-          
-          const diffLong = sUp - c;
-          const diffShort = c - sDown;
-          
-          const pnlLong = diffLong * (isNaN(q) ? 1 : q);
-          const pnlShort = diffShort * (isNaN(q) ? 1 : q);
-          
-          let html = renderSingleCard(`看漲 +${formatNumber(absPct, 2)}% (作多)`, sUp, diffLong, pnlLong, absPct, q);
-          html += renderSingleCard(`看跌 -${formatNumber(absPct, 2)}% (作空)`, sDown, diffShort, pnlShort, absPct, q, 'mt-2');
-          els.singleResult.innerHTML = html;
-      } else {
-          els.singleResult.classList.add('hidden');
+      // 雙向計算：輸入%推賣價，輸入賣價推%
+      if (activeSingleMode === 'pct' && !isNaN(pct)) {
+         s = c * (1 + pct / 100);
+         els.singleSellInput.value = parseFloat(s.toFixed(4));
+      } else if (activeSingleMode === 'sell' && !isNaN(s)) {
+         pct = ((s - c) / c) * 100;
+         els.singlePctInput.value = parseFloat(pct.toFixed(2));
       }
-    };
 
-    function renderSingleCard(title, targetPrice, priceDiff, totalPnl, pct, q, extraClass = '') {
-        const isProfit = totalPnl >= 0;
-        const color = isProfit ? 'text-[#00e676]' : 'text-[#ff5252]';
-        const sign = isProfit ? '+' : '';
-        const bgClass = isProfit ? 'bg-[#00e676]/10 border-[#00e676]/30' : 'bg-[#ff5252]/10 border-[#ff5252]/30';
-
-        let h = `<div class="p-2.5 rounded-xl border ${bgClass} text-[11px] ${extraClass}">`;
-        h += `<div class="flex justify-between items-center mb-1"><span class="text-slate-200 font-bold">${title}</span><span class="text-xs font-bold text-white">目標價: ${formatNumber(targetPrice, 4)}</span></div>`;
-        h += `<div class="flex justify-between items-center opacity-90"><span class="text-slate-300 font-medium">價差</span><span class="font-bold ${color}">${sign}${formatNumber(priceDiff, 4)}</span></div>`;
-        h += `<div class="flex justify-between items-center opacity-90"><span class="text-slate-300 font-medium">盈虧幅</span><span class="font-bold ${color}">${sign}${formatNumber(pct, 2)}%</span></div>`;
-        
-        if (!isNaN(q) && q > 0) {
-            h += `<div class="mt-1.5 pt-1.5 border-t border-white/10 flex justify-between items-center"><span class="text-slate-200 font-bold">總計損益</span><span class="font-bold text-sm ${color}">${sign}${formatNumber(totalPnl)}</span></div>`;
-        }
-        h += `</div>`;
-        return h;
+      if (!isNaN(c) && !isNaN(s)) {
+        els.singleResult.classList.remove('hidden');
+        const d = s - c, p = (d / c) * 100, color = d >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]';
+        let h = `<div class="flex justify-between"><span class="text-slate-200 font-medium">價差</span><span class="font-bold ${color}">${d >= 0 ? '+' : ''}${formatNumber(d, 4)}</span></div><div class="flex justify-between mt-1"><span class="text-slate-200 font-medium">報酬</span><span class="font-bold ${color}">${p >= 0 ? '+' : ''}${formatNumber(p)}%</span></div>`;
+        if (q > 0) h += `<div class="mt-2 pt-2 border-t border-[#555] flex justify-between"><span class="font-bold text-slate-200">總計損益</span><span class="font-bold text-sm ${color}">${d >= 0 ? '+' : ''}${formatNumber(d * q)}</span></div>`;
+        els.singleResult.innerHTML = h;
+      } else {
+        els.singleResult.classList.add('hidden');
+      }
     }
 
-    if(els.singleSellInput) els.singleSellInput.addEventListener('input', () => { if(els.singlePctInput) els.singlePctInput.value = ''; calculateSingleTrade('sell'); });
-    if(els.singlePctInput) els.singlePctInput.addEventListener('input', () => { if(els.singleSellInput) els.singleSellInput.value = ''; calculateSingleTrade('pct'); });
-    if(els.singleCostInput) els.singleCostInput.addEventListener('input', () => calculateSingleTrade('cost'));
-    if(els.singleQtyInput) els.singleQtyInput.addEventListener('input', () => calculateSingleTrade('qty'));
+    if(els.singleSellInput) els.singleSellInput.addEventListener('input', () => calculateSingleTrade('sell'));
+    if(els.singlePctInput) els.singlePctInput.addEventListener('input', () => calculateSingleTrade('pct'));
+    if(els.singleCostInput) els.singleCostInput.addEventListener('input', () => calculateSingleTrade());
+    if(els.singleQtyInput) els.singleQtyInput.addEventListener('input', () => calculateSingleTrade());
 
     function updateCurrentPriceColor(shouldRenderTable = true) {
       if(!els.currentPriceDisp) return;
@@ -2398,7 +2367,7 @@
       if (totalShares > 0) {
         let totalPnl = 0;
         records.forEach(r => {
-           totalPnl += (r.direction === 'short' ? (r.price - v) : (v - r.price)) * r.quantity;
+           totalPnl += (v - r.price) * r.quantity;
         });
         const color = totalPnl >= 0 ? '#00e676' : '#ff5252';
         if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber(totalPnl); }
