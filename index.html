@@ -1471,13 +1471,21 @@
       const dirRadio = document.querySelector('input[name="ehDirection"]:checked');
       rec.direction = dirRadio ? dirRadio.value : 'long';
 
-      // --- 同步修改當前倉位 (Current Position) ---
+      // --- 🌟 嚴格修復：同步修改當前倉位 (Current Position) 時的防呆機制 ---
       let targetRecord = null;
       if (id.endsWith('h')) {
          targetRecord = records.find(r => r.id === id.replace('h', ''));
       }
       if (!targetRecord) {
-         targetRecord = records.find(r => r.ticker === oldTicker && r.price === oldPrice && r.quantity === oldQty && r.direction === oldDir);
+         // 嚴格判定：不僅價格、數量要對，且建立的時間戳必須相隔不到 5 秒 (5000 毫秒)，避免誤砍剛好長一樣的倉位
+         const editIdNum = parseInt(id.replace(/\D/g, '')) || 0;
+         targetRecord = records.find(r => 
+             r.ticker === oldTicker && 
+             r.price === oldPrice && 
+             r.quantity === oldQty && 
+             r.direction === oldDir &&
+             Math.abs(parseInt(r.id) - editIdNum) < 5000
+         );
       }
       
       if (targetRecord) {
@@ -1487,7 +1495,7 @@
          targetRecord.cost = rec.price * rec.quantity;
          targetRecord.direction = rec.direction;
       }
-      // ------------------------------------------
+      // -------------------------------------------------------------
 
       tradeHistory.sort((a,b) => {
         let timeA = a.dateStr ? new Date(a.dateStr).getTime() : parseInt(a.id);
@@ -1542,10 +1550,13 @@
       return new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num);
     }
     
+    // 🌟 修正：處理負數淨流向格式化排版破裂問題
     function formatVol(num) {
-      if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
-      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-      return num.toFixed(0);
+      const absNum = Math.abs(num);
+      const sign = num < 0 ? '-' : '';
+      if (absNum >= 1000000) return sign + (absNum / 1000000).toFixed(2) + 'M';
+      if (absNum >= 1000) return sign + (absNum / 1000).toFixed(1) + 'K';
+      return sign + absNum.toFixed(0);
     }
 
     // --- 音效設定區塊 ---
@@ -1894,37 +1905,37 @@
           let rises = [];
           let prices = [];
 
-          // 🌟 完全剝離：強制固定使用 Twelve Data，不再理會上方下拉選單！
-          const interval = mode === 'today' ? '5min' : '1day';
-          let url = '';
-          if (mode === 'today') {
-              url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=390&apikey=${TWELVE_DATA_API_KEY}`;
-          } else {
-              url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&start_date=${startDate}&end_date=${endDate} 23:59:59&apikey=${TWELVE_DATA_API_KEY}`;
-          }
-          
-          const res = await fetch(url);
-          const data = await res.json();
-          
-          if (data.code === 429) throw new Error(getTwelveDataRateLimitMsg());
-          if (data.code === 401) throw new Error('Twelve Data API Key 無效');
-          
-          if (data.values && data.values.length > 0) {
-              const sortedValues = data.values.reverse();
+          const source = els.dataSourceSelect ? els.dataSourceSelect.value : 'finnhub';
+
+          if (source === 'finnhub') {
+              const resolution = mode === 'today' ? '5' : 'D';
+              let from, to;
+              if (mode === 'today') {
+                  to = Math.floor(Date.now() / 1000);
+                  from = to - (4 * 24 * 60 * 60); 
+              } else {
+                  from = Math.floor(new Date(startDate).getTime() / 1000);
+                  to = Math.floor(new Date(endDate + "T23:59:59").getTime() / 1000);
+              }
+              const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
+              const res = await fetch(url);
+              const data = await res.json();
+              if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得該區間資料，請確認代號或 API Key。');
+
+              // 🌟 安全修復：如果因為沒有預設代碼而拿到空數據，要跳出安全提示
               if (mode === 'today') {
                   let startIndex = 0;
-                  for (let i = sortedValues.length - 1; i > 0; i--) {
-                      const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
-                      const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
-                      if (currTime - prevTime > 14400000) { startIndex = i; break; }
+                  for (let i = data.t.length - 1; i > 0; i--) {
+                      if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
                   }
-                  const todayValues = sortedValues.slice(startIndex);
-                  prices = todayValues.map(v => parseFloat(v.close));
+                  for (let i = startIndex; i < data.t.length; i++) {
+                      prices.push(data.c[i]);
+                  }
               } else {
-                  prices = sortedValues.map(v => parseFloat(v.close));
-                  for (let i = 0; i < sortedValues.length; i++) {
-                      const h = parseFloat(sortedValues[i].high);
-                      const l = parseFloat(sortedValues[i].low);
+                  prices = data.c;
+                  for (let i = 0; i < data.h.length; i++) {
+                      const h = data.h[i];
+                      const l = data.l[i];
                       if (h > 0 && h > l) {
                           drops.push(((h - l) / h) * 100);
                           rises.push(((h - l) / l) * 100);
@@ -1932,7 +1943,45 @@
                   }
               }
           } else {
-              throw new Error(data.message || '該區間無法取得歷史資料');
+              const interval = mode === 'today' ? '5min' : '1day';
+              let url = '';
+              if (mode === 'today') {
+                  url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=390&apikey=${TWELVE_DATA_API_KEY}`;
+              } else {
+                  url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&start_date=${startDate}&end_date=${endDate} 23:59:59&apikey=${TWELVE_DATA_API_KEY}`;
+              }
+              
+              const res = await fetch(url);
+              const data = await res.json();
+              
+              if (data.code === 429) throw new Error(getTwelveDataRateLimitMsg());
+              if (data.code === 401) throw new Error('Twelve Data API Key 無效');
+              
+              if (data.values && data.values.length > 0) {
+                  const sortedValues = data.values.reverse();
+                  if (mode === 'today') {
+                      let startIndex = 0;
+                      for (let i = sortedValues.length - 1; i > 0; i--) {
+                          const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
+                          const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
+                          if (currTime - prevTime > 14400000) { startIndex = i; break; }
+                      }
+                      const todayValues = sortedValues.slice(startIndex);
+                      prices = todayValues.map(v => parseFloat(v.close));
+                  } else {
+                      prices = sortedValues.map(v => parseFloat(v.close));
+                      for (let i = 0; i < sortedValues.length; i++) {
+                          const h = parseFloat(sortedValues[i].high);
+                          const l = parseFloat(sortedValues[i].low);
+                          if (h > 0 && h > l) {
+                              drops.push(((h - l) / h) * 100);
+                              rises.push(((h - l) / l) * 100);
+                          }
+                      }
+                  }
+              } else {
+                  throw new Error(data.message || '該區間無法取得歷史資料');
+              }
           }
 
           if (mode === 'today' && prices.length > 0) {
@@ -2027,34 +2076,28 @@
           let upCount = 0, downCount = 0, flatCount = 0;
           let upVol = 0, downVol = 0, flatVol = 0;
 
-          // 🌟 完全剝離：1分K分析 強制固定使用 Twelve Data
-          const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1min&outputsize=1000&apikey=${TWELVE_DATA_API_KEY}`;
+          // 🌟 修正：此處直接固定為 finnhub，因為 twelvedata 對 1分K 有限額且延遲
+          const to = Math.floor(Date.now() / 1000);
+          const from = to - (4 * 24 * 60 * 60); 
+          const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=1&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
           const res = await fetch(url);
           const data = await res.json();
           
-          if (data.code === 429) throw new Error(getTwelveDataRateLimitMsg());
-          if (data.code === 401) throw new Error('Twelve Data API Key 無效');
-          if (!data.values || data.values.length === 0) throw new Error('無法取得歷史資料');
-          
-          const sortedValues = data.values.reverse();
+          if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('無法取得該代碼的 1分K 歷史數據');
           
           let startIndex = 0;
-          for (let i = sortedValues.length - 1; i > 0; i--) {
-              const currTime = new Date(sortedValues[i].datetime.replace(' ', 'T')).getTime();
-              const prevTime = new Date(sortedValues[i-1].datetime.replace(' ', 'T')).getTime();
-              if (currTime - prevTime > 14400000) { startIndex = i; break; }
+          for (let i = data.t.length - 1; i > 0; i--) {
+              if (data.t[i] - data.t[i - 1] > 14400) { startIndex = i; break; }
           }
           
-          const todayValues = sortedValues.slice(startIndex);
-          
-          todayValues.forEach(v => {
-              const o = parseFloat(v.open);
-              const c = parseFloat(v.close);
-              const vol = parseFloat(v.volume || 0);
-              if (c > o) { upCount++; upVol += vol; }
-              else if (c < o) { downCount++; downVol += vol; }
-              else { flatCount++; flatVol += vol; }
-          });
+          for (let i = startIndex; i < data.t.length; i++) {
+              const o = data.o[i];
+              const c = data.c[i];
+              const v = data.v[i] || 0;
+              if (c > o) { upCount++; upVol += v; }
+              else if (c < o) { downCount++; downVol += v; }
+              else { flatCount++; flatVol += v; }
+          }
 
           const totalCount = upCount + downCount + flatCount;
           if (totalCount === 0) throw new Error('計算結果無有效 K 線');
@@ -2081,11 +2124,12 @@
               const volDownPct = (downVol / totalVol) * 100;
               const volFlatPct = (flatVol / totalVol) * 100;
 
+              // 顯示為絕對值，並附上符號 (解決 M/K 單位的負數問題)
               els.candleVolUp.textContent = formatVol(upVol);
               els.candleVolDown.textContent = formatVol(downVol);
               
               const netVol = upVol - downVol;
-              const netSign = netVol > 0 ? '+' : '';
+              const netSign = netVol > 0 ? '+' : (netVol < 0 ? '-' : '');
               const netColor = netVol > 0 ? 'text-[#00e676] bg-[#00e676]/10' : netVol < 0 ? 'text-[#ff5252] bg-[#ff5252]/10' : 'text-slate-400 bg-[#333]';
               
               els.candleVolNet.textContent = `${netSign}${formatVol(netVol)}`;
@@ -2133,6 +2177,7 @@
       
       if(els.historyActions) els.historyActions.classList.toggle('hidden', tab !== 'history');
 
+      // 🚀 效能優化：切換到該分頁時，才執行重繪
       if(tab === 'current') renderTable();
       if(tab === 'history') renderHistoryTable();
       if(tab === 'report') renderReport();
@@ -2774,7 +2819,15 @@
          let foundInRecords = targetRecordId ? records.find(r => r.id === targetRecordId) : null;
          
          if (!foundInRecords) {
-            foundInRecords = records.find(r => r.ticker === rec.ticker && r.price === rec.price && r.quantity === rec.quantity && r.direction === rec.direction);
+            // 🌟 嚴格修復：加入毫秒數比對，防止誤砍了其他一模一樣的當前倉位
+            const deleteIdNum = parseInt(id.replace(/\D/g, '')) || 0;
+            foundInRecords = records.find(r => 
+                r.ticker === rec.ticker && 
+                r.price === rec.price && 
+                r.quantity === rec.quantity && 
+                r.direction === rec.direction &&
+                Math.abs(parseInt(r.id) - deleteIdNum) < 5000
+            );
          }
          
          if (foundInRecords) {
