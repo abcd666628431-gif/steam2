@@ -1177,6 +1177,15 @@
       btnFilterLoss: document.getElementById('btnFilterLoss')
     };
 
+    // --- 輔助：智慧 API 額度提示 ---
+    function getTwelveDataRateLimitMsg() {
+      // 檢查是否還在用我內建的「全網共用」預設 Key
+      if (TWELVE_DATA_API_KEY === 'c56ad44f83f64dcf936b8340786e0887') {
+        return '預設共用的 TwelveData 額度已被全球耗盡！請點擊右上角更換「專屬 API Key」。';
+      }
+      return '您專屬的 TwelveData API 已達免費上限 (每分鐘 8 次)，請稍後再試！';
+    }
+
     // --- UI 工具 (浮動通知與自訂對話框) ---
     window.showToast = function(msg, type = 'info') {
       const toast = document.createElement('div');
@@ -1885,7 +1894,7 @@
           let rises = [];
           let prices = [];
 
-          // 🌟 徹底剝離：強制波段分析固定使用 Twelve Data，不再跟隨上方報價設定
+          // 🌟 完全剝離：強制固定使用 Twelve Data，不再理會上方下拉選單！
           const interval = mode === 'today' ? '5min' : '1day';
           let url = '';
           if (mode === 'today') {
@@ -1897,7 +1906,7 @@
           const res = await fetch(url);
           const data = await res.json();
           
-          if (data.code === 429) throw new Error('TwelveData 免費額度已滿！(預設為共用Key，請點右上角更換專屬API Key)');
+          if (data.code === 429) throw new Error(getTwelveDataRateLimitMsg());
           if (data.code === 401) throw new Error('Twelve Data API Key 無效');
           
           if (data.values && data.values.length > 0) {
@@ -2015,15 +2024,15 @@
       btn.disabled = true;
 
       try {
-          // 🌟 徹底剝離：1分K分析 強制固定使用 Twelve Data，不跟隨上方設定
           let upCount = 0, downCount = 0, flatCount = 0;
           let upVol = 0, downVol = 0, flatVol = 0;
 
+          // 🌟 完全剝離：1分K分析 強制固定使用 Twelve Data
           const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1min&outputsize=1000&apikey=${TWELVE_DATA_API_KEY}`;
           const res = await fetch(url);
           const data = await res.json();
           
-          if (data.code === 429) throw new Error('TwelveData 免費額度已滿！(預設為共用Key，請點右上角更換專屬API Key)');
+          if (data.code === 429) throw new Error(getTwelveDataRateLimitMsg());
           if (data.code === 401) throw new Error('Twelve Data API Key 無效');
           if (!data.values || data.values.length === 0) throw new Error('無法取得歷史資料');
           
@@ -2445,7 +2454,7 @@
         } else {
           const res = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${TWELVE_DATA_API_KEY}`);
           const data = await res.json();
-          if (data.code === 429) return showToast('Twelve Data 頻率達免費上限 (每分鐘8次)', 'error');
+          if (data.code === 429) return showToast(getTwelveDataRateLimitMsg(), 'error');
           if (data.code === 401) return showToast('Twelve Data API Key 無效，請重新設置', 'error');
           
           if (data && data.price) {
@@ -2498,7 +2507,7 @@
            if (data.code === 429) {
               if(els.autoRefreshCheckbox) els.autoRefreshCheckbox.checked = false; 
               clearInterval(quoteInterval);
-              showToast('自動刷新暫停 (達 TwelveData API 限制)', 'error'); return;
+              showToast(`自動刷新暫停：${getTwelveDataRateLimitMsg()}`, 'error'); return;
            }
            if (data && data.price) {
               const price = parseFloat(data.price);
@@ -2676,6 +2685,12 @@
     if(els.singlePctInput) els.singlePctInput.addEventListener('input', () => calculateSingleTrade('pct'));
     if(els.singleCostInput) els.singleCostInput.addEventListener('input', () => calculateSingleTrade());
     if(els.singleQtyInput) els.singleQtyInput.addEventListener('input', () => calculateSingleTrade());
+
+    // 🌟 修正：移除舊版有 BUG 的 updateCurrentPriceColor，將手動輸入直接綁定到新的核心函數
+    if(els.currentPriceDisp) els.currentPriceDisp.addEventListener('input', () => {
+      updateDashboard();
+      if (activeRecordsTab === 'current') renderTable();
+    });
 
     function updatePreviewAvgCost() {
       if(!els.qtyInput || !els.priceInput || !els.previewAvgCostContainer || !els.previewAvgCost) return;
