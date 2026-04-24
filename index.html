@@ -933,7 +933,13 @@
             });
             const color = totalPnl >= 0 ? '#00e676' : '#ff5252';
             if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber(totalPnl); }
-            if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%'; }
+            
+            // 安全防護：避免 symCost 為 0 導致的 NaN 或 Infinity 錯誤
+            if (symCost > 0) {
+              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%'; }
+            } else {
+              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '-'; }
+            }
         } else {
             if(els.currentPriceDisp) els.currentPriceDisp.style.color = '#fff';
             if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = '#718096'; els.currentPnlAmountDisp.textContent = '-'; }
@@ -1179,7 +1185,6 @@
 
     // --- 輔助：智慧 API 額度提示 ---
     function getTwelveDataRateLimitMsg() {
-      // 檢查是否還在用我內建的「全網共用」預設 Key
       if (TWELVE_DATA_API_KEY === 'c56ad44f83f64dcf936b8340786e0887') {
         return '預設共用的 TwelveData 額度已被全球耗盡！請點擊右上角更換「專屬 API Key」。';
       }
@@ -1388,7 +1393,6 @@
       const dateObj = new Date(dateVal);
       const timeStr = dateObj.toLocaleDateString('zh-TW', {month:'numeric', day:'numeric'});
       
-      // 確保同步 ID，儘管這是歷史手動紀錄不一定在當前倉位中，還是保持規範
       const syncId = Date.now().toString();
 
       tradeHistory.unshift({ 
@@ -1449,7 +1453,6 @@
       const rec = tradeHistory.find(r => r.id === id);
       if (!rec) return;
 
-      // 儲存舊資料以利用比對 (解決舊版本毫秒誤差無法對齊的問題)
       const oldTicker = rec.ticker;
       const oldPrice = rec.price;
       const oldQty = rec.quantity;
@@ -1471,13 +1474,12 @@
       const dirRadio = document.querySelector('input[name="ehDirection"]:checked');
       rec.direction = dirRadio ? dirRadio.value : 'long';
 
-      // --- 🌟 嚴格修復：同步修改當前倉位 (Current Position) 時的防呆機制 ---
+      // --- 同步修改當前倉位 (Current Position) ---
       let targetRecord = null;
       if (id.endsWith('h')) {
          targetRecord = records.find(r => r.id === id.replace('h', ''));
       }
       if (!targetRecord) {
-         // 嚴格判定：不僅價格、數量要對，且建立的時間戳必須相隔不到 5 秒 (5000 毫秒)，避免誤砍剛好長一樣的倉位
          const editIdNum = parseInt(id.replace(/\D/g, '')) || 0;
          targetRecord = records.find(r => 
              r.ticker === oldTicker && 
@@ -1495,7 +1497,6 @@
          targetRecord.cost = rec.price * rec.quantity;
          targetRecord.direction = rec.direction;
       }
-      // -------------------------------------------------------------
 
       tradeHistory.sort((a,b) => {
         let timeA = a.dateStr ? new Date(a.dateStr).getTime() : parseInt(a.id);
@@ -1550,7 +1551,7 @@
       return new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num);
     }
     
-    // 🌟 修正：處理負數淨流向格式化排版破裂問題
+    // 🌟 處理負數排版：絕對值處理與格式化
     function formatVol(num) {
       const absNum = Math.abs(num);
       const sign = num < 0 ? '-' : '';
@@ -1922,7 +1923,6 @@
               const data = await res.json();
               if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('Finnhub 無法取得該區間資料，請確認代號或 API Key。');
 
-              // 🌟 安全修復：如果因為沒有預設代碼而拿到空數據，要跳出安全提示
               if (mode === 'today') {
                   let startIndex = 0;
                   for (let i = data.t.length - 1; i > 0; i--) {
@@ -2066,7 +2066,7 @@
     if(els.btnAnalyzeVolRange) els.btnAnalyzeVolRange.addEventListener('click', () => analyzeVolatility('range'));
 
     window.analyzeCandlesRatio = async function() {
-      const symbol = 'RKLB';
+      const symbol = 'RKLB'; // 依使用者需求固定為 RKLB
       const btn = els.btnAnalyzeCandles1Min;
       const originalText = btn.innerHTML;
       btn.innerHTML = '分析中...';
@@ -2076,13 +2076,15 @@
           let upCount = 0, downCount = 0, flatCount = 0;
           let upVol = 0, downVol = 0, flatVol = 0;
 
-          // 🌟 修正：此處直接固定為 finnhub，因為 twelvedata 對 1分K 有限額且延遲
+          // 使用 Finnhub 進行 1 分 K 抓取以確保即時性
           const to = Math.floor(Date.now() / 1000);
           const from = to - (4 * 24 * 60 * 60); 
           const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=1&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
           const res = await fetch(url);
           const data = await res.json();
           
+          // 如果沒有讀到有效的預設資料代碼
+          if (typeof TradingView === 'undefined' && data.s !== 'ok') throw new Error('無法取得 1分K，請檢查網路連線或 API Key。');
           if (data.s !== 'ok' || !data.c || data.c.length === 0) throw new Error('無法取得該代碼的 1分K 歷史數據');
           
           let startIndex = 0;
@@ -2129,7 +2131,7 @@
               els.candleVolDown.textContent = formatVol(downVol);
               
               const netVol = upVol - downVol;
-              const netSign = netVol > 0 ? '+' : (netVol < 0 ? '-' : '');
+              const netSign = netVol > 0 ? '+' : '';
               const netColor = netVol > 0 ? 'text-[#00e676] bg-[#00e676]/10' : netVol < 0 ? 'text-[#ff5252] bg-[#ff5252]/10' : 'text-slate-400 bg-[#333]';
               
               els.candleVolNet.textContent = `${netSign}${formatVol(netVol)}`;
@@ -2616,10 +2618,11 @@
     function calculatePnl(activeRecords, symAvgPrice, symCost) {
       if(!els.pnlResult) return;
       if (!activeRecords || activeRecords.length === 0 || symAvgPrice <= 0) { 
+          els.pnlResult.innerHTML = '';
           els.pnlResult.classList.add('hidden'); 
           return; 
       }
-      els.pnlResult.classList.remove('hidden');
+      
       let html = '';
 
       if (activeTargetMode === 'price' && els.targetPriceInput) {
@@ -2686,7 +2689,15 @@
           }
         }
       }
-      els.pnlResult.innerHTML = html;
+      
+      // 🌟 修正：輸入被清空時，隱藏多餘殘影空框
+      if (html) {
+          els.pnlResult.innerHTML = html;
+          els.pnlResult.classList.remove('hidden');
+      } else {
+          els.pnlResult.innerHTML = '';
+          els.pnlResult.classList.add('hidden');
+      }
     }
 
     let activeSingleMode = 'sell';
@@ -2897,7 +2908,6 @@
       }).join('');
     }
 
-    // ... 下方的程式碼無需更動，完整保留
     function renderHistoryTable() {
       const query = els.historySearchInput ? els.historySearchInput.value.toUpperCase().trim() : '';
       const filteredHistory = query ? tradeHistory.filter(r => r.ticker.includes(query)) : tradeHistory;
@@ -3000,6 +3010,7 @@
         els.volEndDate.value = getLocalDateString(now);
       }
 
+      // 🌟 加強加載體驗：先利用本地緩存繪製畫面
       loadAndMigrateData();
       updateSoundUI(); 
       if(els.tickerInput && els.tickerInput.value) { 
