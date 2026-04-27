@@ -333,9 +333,10 @@
         <!-- 試算工具 (包含價位提醒與波段分析) -->
         <div class="card-panel p-1.5 md:p-2 rounded-xl flex flex-col">
           <div class="flex space-x-1 bg-[#0F0F0F] p-1 rounded-lg mb-2 overflow-x-auto no-scrollbar">
-            <button id="btn-tab-target" onclick="switchTab('target')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md bg-[#2979ff] text-white font-bold transition-all">預期試算</button>
-            <button id="btn-tab-single" onclick="switchTab('single')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all">單筆計算</button>
-            <button id="btn-tab-volatility" onclick="switchTab('volatility')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all">波段分析</button>
+            <button id="btn-tab-target" onclick="switchTab('target')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md bg-[#2979ff] text-white font-bold transition-all flex items-center justify-center gap-1">預期試算</button>
+            <button id="btn-tab-single" onclick="switchTab('single')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all flex items-center justify-center gap-1">單筆計算</button>
+            <button id="btn-tab-volatility" onclick="switchTab('volatility')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all flex items-center justify-center gap-1">波段分析</button>
+            <button id="btn-tab-stoploss" onclick="switchTab('stoploss')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all flex items-center justify-center gap-1">🛡️ 止損</button>
             <button id="btn-tab-alert" onclick="switchTab('alert')" class="flex-1 min-w-max text-[12px] py-1.5 px-2 rounded-md text-slate-300 hover:text-white font-medium transition-all flex items-center justify-center gap-1">
               <span>🔔 提醒</span>
             </button>
@@ -504,6 +505,32 @@
                   <div id="candleVolBarDown" class="h-full bg-[#ff5252] transition-all duration-1000" style="width: 0%"></div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Tab: 智能止損 -->
+          <div id="tab-stoploss" class="hidden space-y-2 px-1 pb-1">
+            <button type="button" id="btnCalcStopLoss" class="w-full bg-[#2a2a2a] hover:bg-[#333] border border-[#f59e0b]/50 text-[#f59e0b] text-[11px] font-bold py-1.5 rounded-lg transition-colors">
+                🛡️ 計算推薦止損位 (ATR & 前波)
+            </button>
+            <div id="stopLossResult" class="hidden mt-2 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-[#1e1e1e] border border-[#00e676]/30 rounded-lg p-2 flex flex-col shadow-inner">
+                        <span class="text-[10px] text-[#00e676] font-bold mb-1.5 text-center border-b border-[#00e676]/20 pb-1">🟢 做多止損 (跌破)</span>
+                        <div class="flex justify-between items-center"><span class="text-[9px] text-slate-400">標準 (ATR 1.5x)</span><span id="slLongAtr15" class="text-[11px] font-bold text-white">-</span></div>
+                        <div class="flex justify-between items-center mt-1"><span class="text-[9px] text-slate-400">寬鬆 (ATR 2.0x)</span><span id="slLongAtr20" class="text-[11px] font-bold text-white">-</span></div>
+                        <div class="flex justify-between items-center mt-1"><span class="text-[9px] text-slate-400">形態 (前波低點)</span><span id="slLongSwing" class="text-[11px] font-bold text-white">-</span></div>
+                    </div>
+                    <div class="bg-[#1e1e1e] border border-[#ff5252]/30 rounded-lg p-2 flex flex-col shadow-inner">
+                        <span class="text-[10px] text-[#ff5252] font-bold mb-1.5 text-center border-b border-[#ff5252]/20 pb-1">🔴 做空止損 (突破)</span>
+                        <div class="flex justify-between items-center"><span class="text-[9px] text-slate-400">標準 (ATR 1.5x)</span><span id="slShortAtr15" class="text-[11px] font-bold text-white">-</span></div>
+                        <div class="flex justify-between items-center mt-1"><span class="text-[9px] text-slate-400">寬鬆 (ATR 2.0x)</span><span id="slShortAtr20" class="text-[11px] font-bold text-white">-</span></div>
+                        <div class="flex justify-between items-center mt-1"><span class="text-[9px] text-slate-400">形態 (前波高點)</span><span id="slShortSwing" class="text-[11px] font-bold text-white">-</span></div>
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-500 text-center mt-1.5 px-1 leading-relaxed">
+                  💡 基於 TradingView 策略標準：<br>以近 14 日真實波動幅度 (ATR) 與近 10 日高低點運算。
+                </div>
             </div>
           </div>
 
@@ -1154,6 +1181,18 @@
       candleVolBarUp: document.getElementById('candleVolBarUp'),
       candleVolBarFlat: document.getElementById('candleVolBarFlat'),
       candleVolBarDown: document.getElementById('candleVolBarDown'),
+
+      // 止損建議
+      btnTabStopLoss: document.getElementById('btn-tab-stoploss'),
+      tabStopLoss: document.getElementById('tab-stoploss'),
+      btnCalcStopLoss: document.getElementById('btnCalcStopLoss'),
+      stopLossResult: document.getElementById('stopLossResult'),
+      slLongAtr15: document.getElementById('slLongAtr15'),
+      slLongAtr20: document.getElementById('slLongAtr20'),
+      slLongSwing: document.getElementById('slLongSwing'),
+      slShortAtr15: document.getElementById('slShortAtr15'),
+      slShortAtr20: document.getElementById('slShortAtr20'),
+      slShortSwing: document.getElementById('slShortSwing'),
 
       // Display
       currentPriceDisp: document.getElementById('currentPriceDisp'),
@@ -2185,6 +2224,91 @@
     };
     if(els.btnAnalyzeCandles1Min) els.btnAnalyzeCandles1Min.addEventListener('click', analyzeCandlesRatio);
 
+    // --- 智能止損 (TradingView ATR & 形態學) 邏輯 ---
+    window.calculateSmartStopLoss = async function() {
+      if(!els.tickerInput) return;
+      const symbol = els.tickerInput.value.toUpperCase().trim();
+      if (!symbol) return showToast('請先在上方輸入或抓取股票代號', 'error');
+
+      const btn = els.btnCalcStopLoss;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '計算中...';
+      btn.disabled = true;
+
+      try {
+          let data;
+          try {
+              // 優先使用 Finnhub 抓取日線數據
+              const to = Math.floor(Date.now() / 1000);
+              const from = to - (45 * 24 * 60 * 60);
+              const res = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`);
+              data = await res.json();
+              if (data.s !== 'ok' || !data.c || data.c.length < 15) throw new Error('Finnhub_Fail');
+          } catch (e) {
+              // Finnhub 失敗則退回到 Twelve Data
+              const res = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=45&apikey=${TWELVE_DATA_API_KEY}`);
+              const tdData = await res.json();
+              if (tdData.code === 429) throw new Error(getTwelveDataRateLimitMsg());
+              if (tdData.code === 401) throw new Error('Twelve Data API Key 無效');
+              if (!tdData.values || tdData.values.length < 15) throw new Error('無法取得足夠的歷史日線數據來計算 ATR');
+              
+              const sorted = tdData.values.reverse();
+              data = {
+                  c: sorted.map(v => parseFloat(v.close)),
+                  h: sorted.map(v => parseFloat(v.high)),
+                  l: sorted.map(v => parseFloat(v.low))
+              };
+          }
+
+          // 計算 ATR(14) - Wilder's Smoothing Method
+          const period = 14;
+          let trValues = [];
+          for (let i = 1; i < data.c.length; i++) {
+              const high = data.h[i];
+              const low = data.l[i];
+              const prevClose = data.c[i-1];
+              const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+              trValues.push(tr);
+          }
+          
+          let atr = 0;
+          for (let i = 0; i < trValues.length; i++) {
+              if (i < period) {
+                  atr += trValues[i];
+                  if (i === period - 1) atr /= period; // 最初的 SMA
+              } else {
+                  atr = (atr * (period - 1) + trValues[i]) / period; // 後續用平滑移動
+              }
+          }
+          
+          const currentPrice = data.c[data.c.length - 1];
+          
+          // 計算近期高低點 (近 10 日)
+          const recentLows = data.l.slice(-10);
+          const recentHighs = data.h.slice(-10);
+          const swingLow = Math.min(...recentLows);
+          const swingHigh = Math.max(...recentHighs);
+          
+          els.slLongAtr15.textContent = formatNumber(currentPrice - (atr * 1.5), 2);
+          els.slLongAtr20.textContent = formatNumber(currentPrice - (atr * 2), 2);
+          els.slLongSwing.textContent = formatNumber(swingLow, 2);
+          
+          els.slShortAtr15.textContent = formatNumber(currentPrice + (atr * 1.5), 2);
+          els.slShortAtr20.textContent = formatNumber(currentPrice + (atr * 2), 2);
+          els.slShortSwing.textContent = formatNumber(swingHigh, 2);
+          
+          els.stopLossResult.classList.remove('hidden');
+          showToast(`✅ 智能止損位計算完成 (${symbol})`, 'success');
+      } catch (e) {
+          showToast('止損計算失敗: ' + e.message, 'error');
+          els.stopLossResult.classList.add('hidden');
+      } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      }
+    };
+    if(els.btnCalcStopLoss) els.btnCalcStopLoss.addEventListener('click', calculateSmartStopLoss);
+
     // --- 頁籤切換與日曆報表邏輯 ---
     window.switchRecordsTab = function(tab) {
       activeRecordsTab = tab;
@@ -2213,7 +2337,7 @@
     };
 
     window.switchTab = function(tabId) {
-      ['target', 'single', 'alert', 'volatility'].forEach(t => {
+      ['target', 'single', 'volatility', 'stoploss', 'alert'].forEach(t => {
         const active = t === tabId;
         const tabEl = document.getElementById(`tab-${t}`);
         if(tabEl) tabEl.classList.toggle('hidden', !active);
@@ -2763,9 +2887,10 @@
     if(els.singleCostInput) els.singleCostInput.addEventListener('input', () => calculateSingleTrade());
     if(els.singleQtyInput) els.singleQtyInput.addEventListener('input', () => calculateSingleTrade());
 
-    // 🌟 修正：移除舊版有 BUG 的 updateCurrentPriceColor，將手動輸入直接綁定到新的核心函數
+    // 🌟 修正：將手動輸入直接綁定到新的核心函數，並確保同時刷新下方的當前倉位列表！
     if(els.currentPriceDisp) els.currentPriceDisp.addEventListener('input', () => {
       updateDashboard();
+      if (activeRecordsTab === 'current') renderTable();
     });
 
     function updatePreviewAvgCost() {
