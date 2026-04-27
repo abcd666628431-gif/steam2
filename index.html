@@ -605,7 +605,7 @@
             <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">倉位總盈虧</span>
             <div class="flex flex-col items-start justify-center mt-0 md:mt-0.5">
               <span id="currentPnlAmountDisp" class="text-xs sm:text-sm md:text-xl font-bold text-slate-600 leading-none">-</span>
-              <span id="currentPnlPercentDisp" class="text-[8px] md:text-[10px] font-bold text-slate-600 leading-none mt-0.5 md:mt-1">-</span>
+              <span id="currentPnlPercentDisp" class="text-[8px] md:text-[10px] font-bold text-slate-600 leading-none mt-0.5 md:mt-1">(-)</span>
             </div>
           </div>
         </div>
@@ -981,14 +981,14 @@
             
             // 安全防護：避免 symCost 為 0 導致的 NaN 或 Infinity 錯誤
             if (symCost > 0) {
-              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%'; }
+              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '(' + (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%)'; }
             } else {
-              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '-'; }
+              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '(-)'; }
             }
         } else {
             if(els.currentPriceDisp) els.currentPriceDisp.style.color = '#fff';
             if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = '#718096'; els.currentPnlAmountDisp.textContent = '-'; }
-            if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = '#718096'; els.currentPnlPercentDisp.textContent = '-'; }
+            if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = '#718096'; els.currentPnlPercentDisp.textContent = '(-)'; }
         }
 
         // 連動觸發預期試算的重新計算 (也只使用未隱藏的 visibleRecords)
