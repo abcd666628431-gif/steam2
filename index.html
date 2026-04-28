@@ -981,7 +981,7 @@
             if (symCost > 0) {
               const avgPnlPerShare = totalPnl / symShares;
               if(els.avgPriceDiffDisp) { els.avgPriceDiffDisp.style.color = color; els.avgPriceDiffDisp.textContent = '(每股價差 ' + (avgPnlPerShare > 0 ? '+' : '') + formatNumber(avgPnlPerShare, 4) + ')'; }
-              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '(' + (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%)'; }
+              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (avgPnlPerShare > 0 ? '+' : '') + formatNumber(avgPnlPerShare, 4) + ' (' + (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%)'; }
             } else {
               if(els.avgPriceDiffDisp) { els.avgPriceDiffDisp.style.color = color; els.avgPriceDiffDisp.textContent = '(-)'; }
               if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '(-)'; }
@@ -2227,91 +2227,6 @@
     };
     if(els.btnAnalyzeCandles1Min) els.btnAnalyzeCandles1Min.addEventListener('click', analyzeCandlesRatio);
 
-    // --- 智能止損 (TradingView ATR & 形態學) 邏輯 ---
-    window.calculateSmartStopLoss = async function() {
-      if(!els.tickerInput) return;
-      const symbol = els.tickerInput.value.toUpperCase().trim();
-      if (!symbol) return showToast('請先在上方輸入或抓取股票代號', 'error');
-
-      const btn = els.btnCalcStopLoss;
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '計算中...';
-      btn.disabled = true;
-
-      try {
-          let data;
-          try {
-              // 優先使用 Finnhub 抓取日線數據
-              const to = Math.floor(Date.now() / 1000);
-              const from = to - (45 * 24 * 60 * 60);
-              const res = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`);
-              data = await res.json();
-              if (data.s !== 'ok' || !data.c || data.c.length < 15) throw new Error('Finnhub_Fail');
-          } catch (e) {
-              // Finnhub 失敗則退回到 Twelve Data
-              const res = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=45&apikey=${TWELVE_DATA_API_KEY}`);
-              const tdData = await res.json();
-              if (tdData.code === 429) throw new Error(getTwelveDataRateLimitMsg());
-              if (tdData.code === 401) throw new Error('Twelve Data API Key 無效');
-              if (!tdData.values || tdData.values.length < 15) throw new Error('無法取得足夠的歷史日線數據來計算 ATR');
-              
-              const sorted = tdData.values.reverse();
-              data = {
-                  c: sorted.map(v => parseFloat(v.close)),
-                  h: sorted.map(v => parseFloat(v.high)),
-                  l: sorted.map(v => parseFloat(v.low))
-              };
-          }
-
-          // 計算 ATR(14) - Wilder's Smoothing Method
-          const period = 14;
-          let trValues = [];
-          for (let i = 1; i < data.c.length; i++) {
-              const high = data.h[i];
-              const low = data.l[i];
-              const prevClose = data.c[i-1];
-              const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
-              trValues.push(tr);
-          }
-          
-          let atr = 0;
-          for (let i = 0; i < trValues.length; i++) {
-              if (i < period) {
-                  atr += trValues[i];
-                  if (i === period - 1) atr /= period; // 最初的 SMA
-              } else {
-                  atr = (atr * (period - 1) + trValues[i]) / period; // 後續用平滑移動
-              }
-          }
-          
-          const currentPrice = data.c[data.c.length - 1];
-          
-          // 計算近期高低點 (近 10 日)
-          const recentLows = data.l.slice(-10);
-          const recentHighs = data.h.slice(-10);
-          const swingLow = Math.min(...recentLows);
-          const swingHigh = Math.max(...recentHighs);
-          
-          els.slLongAtr15.textContent = formatNumber(currentPrice - (atr * 1.5), 2);
-          els.slLongAtr20.textContent = formatNumber(currentPrice - (atr * 2), 2);
-          els.slLongSwing.textContent = formatNumber(swingLow, 2);
-          
-          els.slShortAtr15.textContent = formatNumber(currentPrice + (atr * 1.5), 2);
-          els.slShortAtr20.textContent = formatNumber(currentPrice + (atr * 2), 2);
-          els.slShortSwing.textContent = formatNumber(swingHigh, 2);
-          
-          els.stopLossResult.classList.remove('hidden');
-          showToast(`✅ 智能止損位計算完成 (${symbol})`, 'success');
-      } catch (e) {
-          showToast('止損計算失敗: ' + e.message, 'error');
-          els.stopLossResult.classList.add('hidden');
-      } finally {
-          btn.innerHTML = originalText;
-          btn.disabled = false;
-      }
-    };
-    if(els.btnCalcStopLoss) els.btnCalcStopLoss.addEventListener('click', calculateSmartStopLoss);
-
     // --- 頁籤切換與日曆報表邏輯 ---
     window.switchRecordsTab = function(tab) {
       activeRecordsTab = tab;
@@ -2827,13 +2742,21 @@
           } else {
              const targetProfit = (val + costLong - costShort) / netDelta;
              const targetLoss = (-val + costLong - costShort) / netDelta;
+             // 🌟 新增：計算損益金額佔總成本的百分比
+             const pct = symCost > 0 ? (val / symCost) * 100 : 0;
              
              html = `
                <div class="p-2.5 rounded-xl bg-[#00e676]/10 border border-[#00e676]/30 text-[11px]">
-                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標獲利 +${formatNumber(val)}</span><span class="font-bold text-sm text-[#00e676]">${formatNumber(targetProfit > 0 ? targetProfit : 0, 4)}</span></div>
+                 <div class="flex justify-between items-center">
+                   <span class="text-slate-200 font-medium">達標獲利 +${formatNumber(val)} <span class="text-[9px] text-[#00e676] ml-1">(+${formatNumber(pct)}%)</span></span>
+                   <span class="font-bold text-sm text-[#00e676]">${formatNumber(targetProfit > 0 ? targetProfit : 0, 4)}</span>
+                 </div>
                </div>
                <div class="p-2.5 rounded-xl bg-[#ff5252]/10 border border-[#ff5252]/30 text-[11px] mt-2">
-                 <div class="flex justify-between"><span class="text-slate-200 font-medium">達標虧損 -${formatNumber(val)}</span><span class="font-bold text-sm text-[#ff5252]">${formatNumber(targetLoss > 0 ? targetLoss : 0, 4)}</span></div>
+                 <div class="flex justify-between items-center">
+                   <span class="text-slate-200 font-medium">達標虧損 -${formatNumber(val)} <span class="text-[9px] text-[#ff5252] ml-1">(-${formatNumber(pct)}%)</span></span>
+                   <span class="font-bold text-sm text-[#ff5252]">${formatNumber(targetLoss > 0 ? targetLoss : 0, 4)}</span>
+                 </div>
                </div>`;
           }
         }
@@ -3213,7 +3136,8 @@
       }
 
       loadAndMigrateData();
-      updateSoundUI(); 
+      updateSoundUI();
+      
       if(els.tickerInput && els.tickerInput.value) { 
         fetchStockData(); 
         if(els.autoRefreshCheckbox && els.autoRefreshCheckbox.checked) quoteInterval = setInterval(fetchQuoteOnly, (els.refreshIntervalInput.value||2)*1000); 
