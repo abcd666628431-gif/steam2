@@ -588,23 +588,30 @@
           </div>
           <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center">
             <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">平均成本</span>
-            <div class="flex flex-col items-start justify-center mt-0 md:mt-0.5">
-              <span id="avgPriceDisp" class="text-xs sm:text-sm md:text-xl font-bold text-white leading-none mt-0 md:mt-0.5">0</span>
-              <span id="avgPriceDiffDisp" class="text-[8px] md:text-[10px] font-bold text-slate-600 leading-none mt-0.5 md:mt-1">(-)</span>
-            </div>
+            <span id="avgPriceDisp" class="text-xs sm:text-sm md:text-xl font-bold text-white leading-none mt-0 md:mt-0.5">0</span>
           </div>
           <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center">
             <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">當前總持股</span>
             <span id="totalSharesDisp" class="text-xs sm:text-sm md:text-xl font-bold text-[#2979ff] leading-none mt-0 md:mt-0.5">0</span>
           </div>
-          <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center">
-            <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">當前總成本</span>
-            <span id="totalCostDisp" class="text-xs sm:text-sm md:text-xl font-bold text-white leading-none mt-0 md:mt-0.5">0</span>
+          
+          <!-- 🌟 新增：可點擊切換 USD/MOP 並顯示現值 -->
+          <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center cursor-pointer transition-colors hover:bg-[#2a2a2a] group relative" onclick="toggleDashboardMop()" title="點擊切換 USD/MOP">
+            <div class="flex items-center space-x-1 mt-0">
+              <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">當前總成本</span>
+              <span id="costCurrencyLabel" class="text-[6px] text-slate-400 bg-[#333] px-1 rounded leading-none hidden sm:inline">USD</span>
+            </div>
+            <div class="flex flex-col items-start justify-center mt-0 md:mt-0.5">
+              <span id="totalCostDisp" class="text-xs sm:text-sm md:text-xl font-bold text-white leading-none mt-0 md:mt-0.5">$0</span>
+              <span id="totalValueDisp" class="text-[8px] md:text-[10px] font-bold text-slate-400 leading-none mt-0.5 md:mt-1 truncate w-full" title="包含盈虧後的當前現值">現值: $0</span>
+            </div>
           </div>
+          
           <div class="card-panel px-1 md:px-3 py-1 md:py-1.5 rounded-lg flex flex-col justify-center">
             <span class="text-slate-500 text-[7px] md:text-[9px] font-bold uppercase tracking-wider whitespace-nowrap origin-left scale-90 md:scale-100">倉位總盈虧</span>
             <div class="flex flex-col items-start justify-center mt-0 md:mt-0.5">
               <span id="currentPnlAmountDisp" class="text-xs sm:text-sm md:text-xl font-bold text-slate-600 leading-none">-</span>
+              <!-- 🌟 移除每股價差，回歸清爽百分比 -->
               <span id="currentPnlPercentDisp" class="text-[8px] md:text-[10px] font-bold text-slate-600 leading-none mt-0.5 md:mt-1">(-)</span>
             </div>
           </div>
@@ -813,6 +820,15 @@
     let cloudSyncTimestamp = 0; // 雲端時間戳，用來防回音
     let hasSyncedWithServer = false; // 🌟 嚴格雲端同步鎖：確保收到伺服器最新資料前，禁止上傳
 
+    // 🌟 總成本 MOP 顯示切換變數
+    let isDashboardMop = false;
+    const MOP_RATE = 8;
+    
+    window.toggleDashboardMop = function() {
+        isDashboardMop = !isDashboardMop;
+        updateDashboard();
+    };
+
     // 🌟 新增：Firebase 連線與權限診斷工具
     window.diagnoseFirebase = async function() {
         showToast('正在測試 Firebase 資料庫讀寫權限...', 'info');
@@ -887,8 +903,6 @@
        // 加入 includeMetadataChanges: true，讓我們能監聽資料是來自快取還是伺服器
        unsubscribeSnapshot = onSnapshot(docRef, { includeMetadataChanges: true }, (docSnap) => {
            
-           // 🌟 終極防護：Firebase 剛連線時會先丟出「本地的舊快取」。
-           // 我們必須檢查 fromCache，如果為 false 代表這份資料「真正來自伺服器」，此時才解鎖上傳權限！
            if (!docSnap.metadata.fromCache) {
                hasSyncedWithServer = true; 
            }
@@ -896,22 +910,17 @@
            if (docSnap.exists()) {
                const data = docSnap.data();
                
-               // 忽略自己上傳的迴音
                if (data.updatedAt && data.updatedAt <= cloudSyncTimestamp) {
                    if (hasSyncedWithServer) updateSyncStatus('synced');
                    return;
                }
 
-               // 接收到更新的資料
                cloudSyncTimestamp = data.updatedAt || Date.now();
 
                records = data.records || [];
-               // 防呆：確保新的 isHidden 屬性存在
                records.forEach(r => { if (r.isHidden === undefined) r.isHidden = false; });
 
                tradeHistory = data.tradeHistory || [];
-               
-               // 自動校正 Firebase 傳來的舊資料
                if (tradeHistory.length > 0) syncDateStrWithTime(tradeHistory);
                
                savedTickers = data.savedTickers || [];
@@ -942,10 +951,8 @@
         const currentSym = els.tickerInput ? els.tickerInput.value.toUpperCase().trim() : '';
         const v = els.currentPriceDisp ? parseFloat(els.currentPriceDisp.value) : NaN;
 
-        // 1. 篩選出符合目前上方輸入框代號的倉位紀錄
+        // 只篩選出符合目前上方輸入框代號的倉位紀錄，並剔除已被使用者臨時隱藏的紀錄
         const activeRecords = currentSym ? records.filter(r => r.ticker === currentSym) : [];
-        
-        // 2. 🌟 剔除已被使用者臨時隱藏的紀錄
         const visibleRecords = activeRecords.filter(r => !r.isHidden);
         
         let symShares = 0, symCost = 0;
@@ -956,7 +963,6 @@
         const symAvgPrice = symShares > 0 ? symCost / symShares : 0;
 
         if(els.totalSharesDisp) els.totalSharesDisp.textContent = formatNumber(symShares);
-        if(els.totalCostDisp) els.totalCostDisp.textContent = formatNumber(symCost);
         if(els.avgPriceDisp) els.avgPriceDisp.textContent = formatNumber(symAvgPrice, 4);
 
         const dis = symShares === 0;
@@ -964,11 +970,12 @@
         if(els.percentInput) els.percentInput.disabled = dis;
         if(els.expectedPnlInput) els.expectedPnlInput.disabled = dis;
 
+        let totalPnl = 0;
+
         if (!isNaN(v) && symShares > 0) {
             const c = (symAvgPrice > 0 && v > symAvgPrice) ? '#00e676' : (symAvgPrice > 0 && v < symAvgPrice) ? '#ff5252' : '#fff';
             if (els.currentPriceDisp) els.currentPriceDisp.style.color = c;
 
-            let totalPnl = 0;
             visibleRecords.forEach(r => {
                 const isShort = r.direction === 'short';
                 const diff = isShort ? (r.price - v) : (v - r.price);
@@ -977,23 +984,35 @@
             const color = totalPnl >= 0 ? '#00e676' : '#ff5252';
             if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = color; els.currentPnlAmountDisp.textContent = (totalPnl > 0 ? '+' : '') + formatNumber(totalPnl); }
             
-            // 安全防護：避免 symCost 為 0 導致的 NaN 或 Infinity 錯誤
             if (symCost > 0) {
-              const avgPnlPerShare = totalPnl / symShares;
-              if(els.avgPriceDiffDisp) { els.avgPriceDiffDisp.style.color = color; els.avgPriceDiffDisp.textContent = '(每股價差 ' + (avgPnlPerShare > 0 ? '+' : '') + formatNumber(avgPnlPerShare, 4) + ')'; }
-              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = (avgPnlPerShare > 0 ? '+' : '') + formatNumber(avgPnlPerShare, 4) + ' (' + (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%)'; }
+              if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '(' + (totalPnl > 0 ? '+' : '') + formatNumber((totalPnl/symCost)*100) + '%)'; }
             } else {
-              if(els.avgPriceDiffDisp) { els.avgPriceDiffDisp.style.color = color; els.avgPriceDiffDisp.textContent = '(-)'; }
               if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = color; els.currentPnlPercentDisp.textContent = '(-)'; }
             }
         } else {
             if(els.currentPriceDisp) els.currentPriceDisp.style.color = '#fff';
-            if(els.avgPriceDiffDisp) { els.avgPriceDiffDisp.style.color = '#718096'; els.avgPriceDiffDisp.textContent = '(-)'; }
             if(els.currentPnlAmountDisp) { els.currentPnlAmountDisp.style.color = '#718096'; els.currentPnlAmountDisp.textContent = '-'; }
             if(els.currentPnlPercentDisp) { els.currentPnlPercentDisp.style.color = '#718096'; els.currentPnlPercentDisp.textContent = '(-)'; }
         }
 
-        // 連動觸發預期試算的重新計算 (也只使用未隱藏的 visibleRecords)
+        // --- 🌟 處理 MOP 切換與總成本/現值顯示 ---
+        const totalValue = symCost + totalPnl;
+        const multiplier = isDashboardMop ? MOP_RATE : 1;
+        const prefix = isDashboardMop ? 'MOP$' : '$';
+        
+        if(els.costCurrencyLabel) els.costCurrencyLabel.textContent = isDashboardMop ? 'MOP' : 'USD';
+        if(els.totalCostDisp) els.totalCostDisp.textContent = prefix + formatNumber(symCost * multiplier);
+        
+        if(els.totalValueDisp) {
+            if (!isNaN(v) && symShares > 0) {
+               els.totalValueDisp.textContent = '現值: ' + prefix + formatNumber(totalValue * multiplier);
+               els.totalValueDisp.className = `text-[8px] md:text-[10px] font-bold leading-none mt-0.5 md:mt-1 ${totalPnl >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`;
+            } else {
+               els.totalValueDisp.textContent = '現值: ' + prefix + formatNumber(symCost * multiplier);
+               els.totalValueDisp.className = 'text-[8px] md:text-[10px] font-bold text-slate-400 leading-none mt-0.5 md:mt-1';
+            }
+        }
+
         calculatePnl(visibleRecords, symAvgPrice, symCost); 
     }
 
@@ -1009,7 +1028,6 @@
           localStorage.setItem('stockCalcLastLocalUpdate_PRO', Date.now().toString());
       }
 
-      // 使用重構後的動態更新函數
       updateDashboard();
 
       if (activeRecordsTab === 'current') renderTable();
@@ -1024,8 +1042,6 @@
     };
 
     window.pushDataToCloud = function() {
-       // 🌟 終極防護：如果還沒收到「伺服器端」確認的最新資料，絕對禁止任何本地上傳行為！
-       // 徹底解決手機端背景刷新把舊快取傳上雲端的覆蓋災情。
        if (!currentUser || !hasSyncedWithServer) return; 
        
        updateSyncStatus('syncing');
@@ -1199,9 +1215,10 @@
       // Display
       currentPriceDisp: document.getElementById('currentPriceDisp'),
       avgPriceDisp: document.getElementById('avgPriceDisp'),
-      avgPriceDiffDisp: document.getElementById('avgPriceDiffDisp'),
       totalSharesDisp: document.getElementById('totalSharesDisp'),
       totalCostDisp: document.getElementById('totalCostDisp'),
+      totalValueDisp: document.getElementById('totalValueDisp'),
+      costCurrencyLabel: document.getElementById('costCurrencyLabel'),
       currentPnlAmountDisp: document.getElementById('currentPnlAmountDisp'),
       currentPnlPercentDisp: document.getElementById('currentPnlPercentDisp'),
       
@@ -2227,6 +2244,91 @@
     };
     if(els.btnAnalyzeCandles1Min) els.btnAnalyzeCandles1Min.addEventListener('click', analyzeCandlesRatio);
 
+    // --- 智能止損 (TradingView ATR & 形態學) 邏輯 ---
+    window.calculateSmartStopLoss = async function() {
+      if(!els.tickerInput) return;
+      const symbol = els.tickerInput.value.toUpperCase().trim();
+      if (!symbol) return showToast('請先在上方輸入或抓取股票代號', 'error');
+
+      const btn = els.btnCalcStopLoss;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '計算中...';
+      btn.disabled = true;
+
+      try {
+          let data;
+          try {
+              // 優先使用 Finnhub 抓取日線數據
+              const to = Math.floor(Date.now() / 1000);
+              const from = to - (45 * 24 * 60 * 60);
+              const res = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`);
+              data = await res.json();
+              if (data.s !== 'ok' || !data.c || data.c.length < 15) throw new Error('Finnhub_Fail');
+          } catch (e) {
+              // Finnhub 失敗則退回到 Twelve Data
+              const res = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=45&apikey=${TWELVE_DATA_API_KEY}`);
+              const tdData = await res.json();
+              if (tdData.code === 429) throw new Error(getTwelveDataRateLimitMsg());
+              if (tdData.code === 401) throw new Error('Twelve Data API Key 無效');
+              if (!tdData.values || tdData.values.length < 15) throw new Error('無法取得足夠的歷史日線數據來計算 ATR');
+              
+              const sorted = tdData.values.reverse();
+              data = {
+                  c: sorted.map(v => parseFloat(v.close)),
+                  h: sorted.map(v => parseFloat(v.high)),
+                  l: sorted.map(v => parseFloat(v.low))
+              };
+          }
+
+          // 計算 ATR(14) - Wilder's Smoothing Method
+          const period = 14;
+          let trValues = [];
+          for (let i = 1; i < data.c.length; i++) {
+              const high = data.h[i];
+              const low = data.l[i];
+              const prevClose = data.c[i-1];
+              const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+              trValues.push(tr);
+          }
+          
+          let atr = 0;
+          for (let i = 0; i < trValues.length; i++) {
+              if (i < period) {
+                  atr += trValues[i];
+                  if (i === period - 1) atr /= period; // 最初的 SMA
+              } else {
+                  atr = (atr * (period - 1) + trValues[i]) / period; // 後續用平滑移動
+              }
+          }
+          
+          const currentPrice = data.c[data.c.length - 1];
+          
+          // 計算近期高低點 (近 10 日)
+          const recentLows = data.l.slice(-10);
+          const recentHighs = data.h.slice(-10);
+          const swingLow = Math.min(...recentLows);
+          const swingHigh = Math.max(...recentHighs);
+          
+          els.slLongAtr15.textContent = formatNumber(currentPrice - (atr * 1.5), 2);
+          els.slLongAtr20.textContent = formatNumber(currentPrice - (atr * 2), 2);
+          els.slLongSwing.textContent = formatNumber(swingLow, 2);
+          
+          els.slShortAtr15.textContent = formatNumber(currentPrice + (atr * 1.5), 2);
+          els.slShortAtr20.textContent = formatNumber(currentPrice + (atr * 2), 2);
+          els.slShortSwing.textContent = formatNumber(swingHigh, 2);
+          
+          els.stopLossResult.classList.remove('hidden');
+          showToast(`✅ 智能止損位計算完成 (${symbol})`, 'success');
+      } catch (e) {
+          showToast('止損計算失敗: ' + e.message, 'error');
+          els.stopLossResult.classList.add('hidden');
+      } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      }
+    };
+    if(els.btnCalcStopLoss) els.btnCalcStopLoss.addEventListener('click', calculateSmartStopLoss);
+
     // --- 頁籤切換與日曆報表邏輯 ---
     window.switchRecordsTab = function(tab) {
       activeRecordsTab = tab;
@@ -2742,7 +2844,6 @@
           } else {
              const targetProfit = (val + costLong - costShort) / netDelta;
              const targetLoss = (-val + costLong - costShort) / netDelta;
-             // 🌟 新增：計算損益金額佔總成本的百分比
              const pct = symCost > 0 ? (val / symCost) * 100 : 0;
              
              html = `
@@ -2996,7 +3097,7 @@
           
           const diffPerShare = isShort ? (r.price - currentPrice) : (currentPrice - r.price);
           const diffSign = diffPerShare > 0 ? '+' : '';
-          priceDiffHtml = `<div class="text-[8px] md:text-[9px] font-bold mt-0.5 ${color}" title="每股價差">${diffSign}${formatNumber(diffPerShare, 4)}</div>`;
+          priceDiffHtml = `<span class="text-[8px] md:text-[10px] font-bold ml-1 ${color}" title="每股價差">(${diffSign}${formatNumber(diffPerShare, 4)})</span>`;
         }
 
         // 視覺上淡化已被排除計算的隱藏紀錄
@@ -3010,9 +3111,8 @@
             </div>
           </td>
           <td class="px-1.5 py-1.5 md:px-6 md:py-3 text-[10px] md:text-sm">${formatNumber(r.quantity)}</td>
-          <td class="px-1.5 py-1.5 md:px-6 md:py-3 text-[10px] md:text-sm text-slate-300">
-            <div>$${formatNumber(r.price, 4)}</div>
-            ${priceDiffHtml}
+          <td class="px-1.5 py-1.5 md:px-6 md:py-3 text-[10px] md:text-sm text-slate-300 whitespace-nowrap">
+            $${formatNumber(r.price, 4)}${priceDiffHtml}
           </td>
           <td class="px-1.5 py-1.5 md:px-6 md:py-3 text-[10px] md:text-sm text-slate-400">$${formatNumber(r.cost)}</td>
           ${pnlHtml}
@@ -3084,7 +3184,7 @@
             
             const diffPerShare = isShort ? (r.price - sPrice) : (sPrice - r.price);
             const diffSign = diffPerShare > 0 ? '+' : '';
-            priceDiffHtml = `<div class="text-[8px] md:text-[9px] font-bold mt-0.5 ${color}" title="每股價差">${diffSign}${formatNumber(diffPerShare, 4)}</div>`;
+            priceDiffHtml = `<div class="text-[8px] md:text-[9px] font-bold mt-0.5 ${color}" title="每股價差">(${diffSign}${formatNumber(diffPerShare, 4)})</div>`;
           }
 
           htmlStr += `
