@@ -3133,9 +3133,9 @@
       }
 
       els.recordsTableBody.innerHTML = records.map((r, index) => {
-        // 🌟 列表資料也套用隱私遮罩
+        // 🌟 列表資料也套用隱私遮罩 (唯獨價位不遮蔽)
         const dispQty = maskText(formatNumber(r.quantity));
-        const dispPrice = maskText(formatNumber(r.price, 4));
+        const dispPrice = formatNumber(r.price, 4); // 🌟 移除 maskText，讓價位始終顯示
         const dispCost = maskText(formatNumber(r.cost));
         
         let pnlHtml = `<td class="px-1.5 py-1.5 md:px-6 md:py-3 text-slate-500 text-[10px] md:text-sm">${maskText('-')}</td>`;
@@ -3239,7 +3239,7 @@
           const newBadge = index === 0 ? '<span class="ml-1 md:ml-2 text-[#ff5252] text-[8px] md:text-[9px] font-black italic tracking-wider animate-pulse drop-shadow-[0_0_5px_rgba(255,82,82,0.8)]">NEW</span>' : '';
           
           const dispQty = maskText(formatNumber(r.quantity));
-          const dispPrice = maskText(formatNumber(r.price, 4));
+          const dispPrice = formatNumber(r.price, 4); // 🌟 移除 maskText，讓買入價始終顯示
 
           if (!isNaN(sPrice)) {
             const fee = parseFloat(r.fee) || 0;
