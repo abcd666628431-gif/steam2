@@ -2718,6 +2718,7 @@
           if (data && data.c) { 
             if(els.currentPriceDisp) els.currentPriceDisp.value = data.c; 
             updateDashboard(); 
+            if (activeRecordsTab === 'current') renderTable(); // 🌟 補回：抓取後刷新當前倉位表格
             checkPriceAlerts(symbol, data.c); 
             saveUIStateLocal();
             updateLastFetchTime(data.t);
@@ -2732,6 +2733,7 @@
             const price = parseFloat(data.price);
             if(els.currentPriceDisp) els.currentPriceDisp.value = price;
             updateDashboard(); 
+            if (activeRecordsTab === 'current') renderTable(); // 🌟 補回：抓取後刷新當前倉位表格
             checkPriceAlerts(symbol, price); 
             saveUIStateLocal();
             updateLastFetchTime();
@@ -2765,6 +2767,7 @@
             if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== data.c) {
               els.currentPriceDisp.value = data.c; 
               updateDashboard();
+              if (activeRecordsTab === 'current') renderTable(); // 🌟 補回：自動刷新後更新表格
               checkPriceAlerts(symbol, data.c);
             }
             updateLastFetchTime(data.t);
@@ -2783,6 +2786,7 @@
               if (els.currentPriceDisp && parseFloat(els.currentPriceDisp.value) !== price) {
                 els.currentPriceDisp.value = price; 
                 updateDashboard();
+                if (activeRecordsTab === 'current') renderTable(); // 🌟 補回：自動刷新後更新表格
                 checkPriceAlerts(symbol, price);
               }
               updateLastFetchTime();
