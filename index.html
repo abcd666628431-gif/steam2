@@ -621,10 +621,13 @@
         </div>
 
         <!-- 圖表 -->
-        <div class="card-panel p-2 md:p-4 rounded-2xl flex flex-col">
-          <div class="flex justify-between items-center mb-1.5 md:mb-3">
-            <div class="flex items-center space-x-2 md:space-x-3">
-              <h2 id="chartTitle" class="text-[11px] md:text-sm font-bold text-white">即時趨勢圖</h2>
+        <div class="card-panel p-1 md:p-2 rounded-xl flex flex-col">
+          <div class="flex justify-between items-end mb-1 md:mb-2 px-1 md:px-2 border-b border-[#333] pb-1.5 pt-1">
+            <div class="flex space-x-4 md:space-x-6 overflow-x-auto no-scrollbar items-end">
+              <button id="tabBtnChart" onclick="switchChartTab('chart')" class="text-[11px] md:text-sm font-bold text-[#2979ff] border-b-2 border-[#2979ff] pb-1 transition-all whitespace-nowrap flex items-center">即時趨勢圖</button>
+              <button id="tabBtnHeatmap" onclick="switchChartTab('heatmap')" class="text-[11px] md:text-sm font-bold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-1 transition-all whitespace-nowrap flex items-center"><span class="mr-1">🔥</span>熱力圖</button>
+            </div>
+            <div id="chartControls" class="flex items-center space-x-2 md:space-x-3 shrink-0 ml-2 mb-1">
               <select id="chartIntervalSelect" class="text-[9px] md:text-[10px] font-bold rounded-md px-1 md:px-2 py-0.5 md:py-1 outline-none cursor-pointer bg-[#2a2a2a] text-white border border-[#444]">
                 <option value="1">1分</option>
                 <option value="5">5分</option>
@@ -632,10 +635,15 @@
                 <option value="D" selected>日線</option>
                 <option value="W">週線</option>
               </select>
+              <span id="chartDateRange" class="text-[8px] md:text-[10px] text-slate-500 font-mono hidden sm:inline">QUANTITATIVE TERMINAL</span>
             </div>
-            <span id="chartDateRange" class="text-[8px] md:text-[10px] text-slate-500 font-mono hidden sm:inline">QUANTITATIVE TERMINAL</span>
           </div>
-          <div id="tvchart" class="w-full h-[260px] md:h-[450px] bg-[#0F0F0F] rounded-xl overflow-hidden border border-[#333]"></div>
+          <div id="chartView" class="w-full h-[260px] md:h-[450px] flex flex-col px-0.5 pb-0.5">
+            <div id="tvchart" class="w-full h-full bg-[#0F0F0F] rounded-lg overflow-hidden"></div>
+          </div>
+          <div id="heatmapView" class="hidden w-full h-[260px] md:h-[450px] flex-col px-0.5 pb-0.5">
+            <div id="heatmapContainer" class="tradingview-widget-container flex-1 w-full h-full rounded-lg overflow-hidden"></div>
+          </div>
         </div>
 
         <!-- 列表 -->
@@ -1269,7 +1277,9 @@
       currentPnlPercentDisp: document.getElementById('currentPnlPercentDisp'),
       
       // Charts & Tables
-      chartTitle: document.getElementById('chartTitle'),
+      tabBtnChart: document.getElementById('tabBtnChart'),
+      chartView: document.getElementById('chartView'),
+      chartControls: document.getElementById('chartControls'),
       chartIntervalSelect: document.getElementById('chartIntervalSelect'),
       tvchartContainer: document.getElementById('tvchart'),
       recordsTableBody: document.getElementById('recordsTableBody'),
@@ -1304,7 +1314,12 @@
       detailsUpdateTime: document.getElementById('detailsUpdateTime'),
       detailsListContainer: document.getElementById('detailsListContainer'),
       btnFilterProfit: document.getElementById('btnFilterProfit'),
-      btnFilterLoss: document.getElementById('btnFilterLoss')
+      btnFilterLoss: document.getElementById('btnFilterLoss'),
+      
+      // Heatmap
+      tabBtnHeatmap: document.getElementById('tabBtnHeatmap'),
+      heatmapView: document.getElementById('heatmapView'),
+      heatmapContainer: document.getElementById('heatmapContainer')
     };
 
     // --- 輔助：智慧 API 額度提示 ---
@@ -2378,13 +2393,67 @@
     };
     if(els.btnCalcStopLoss) els.btnCalcStopLoss.addEventListener('click', calculateSmartStopLoss);
 
+    // --- 圖表區切換與動態加載邏輯 ---
+    window.switchChartTab = function(tab) {
+      const activeClass = 'text-[11px] md:text-sm font-bold text-[#2979ff] border-b-2 border-[#2979ff] pb-1 transition-all whitespace-nowrap flex items-center';
+      const inactiveClass = 'text-[11px] md:text-sm font-bold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-1 transition-all whitespace-nowrap flex items-center';
+
+      if(els.tabBtnChart) els.tabBtnChart.className = tab === 'chart' ? activeClass : inactiveClass;
+      if(els.tabBtnHeatmap) els.tabBtnHeatmap.className = tab === 'heatmap' ? activeClass : inactiveClass;
+
+      if(els.chartView) {
+          els.chartView.classList.toggle('hidden', tab !== 'chart');
+          els.chartView.classList.toggle('flex', tab === 'chart');
+      }
+      if(els.chartControls) {
+          els.chartControls.classList.toggle('hidden', tab !== 'chart');
+          els.chartControls.classList.toggle('flex', tab === 'chart');
+      }
+
+      if(els.heatmapView) {
+          if (tab === 'heatmap') {
+              els.heatmapView.classList.remove('hidden');
+              els.heatmapView.classList.add('flex');
+              
+              if (!window.isHeatmapLoaded && els.heatmapContainer) {
+                  els.heatmapContainer.innerHTML = '<div class="tradingview-widget-container__widget h-full w-full"></div>';
+                  const script = document.createElement('script');
+                  script.src = "https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js";
+                  script.async = true;
+                  // 🌟 修改：將 hasTopBar 和 isDataSetEnabled 設為 false，徹底去除邊框雜訊並最大化熱力圖空間
+                  script.innerHTML = JSON.stringify({
+                      "exchanges": [],
+                      "dataSource": "SPX500",
+                      "grouping": "sector",
+                      "blockSize": "market_cap_basic",
+                      "blockColor": "change",
+                      "locale": "zh_TW",
+                      "symbolUrl": "",
+                      "colorTheme": "dark",
+                      "hasTopBar": false,
+                      "isDataSetEnabled": false,
+                      "isZoomEnabled": true,
+                      "hasSymbolTooltip": true,
+                      "width": "100%",
+                      "height": "100%"
+                  });
+                  els.heatmapContainer.appendChild(script);
+                  window.isHeatmapLoaded = true;
+              }
+          } else {
+              els.heatmapView.classList.add('hidden');
+              els.heatmapView.classList.remove('flex');
+          }
+      }
+    };
+
     // --- 頁籤切換與日曆報表邏輯 ---
     window.switchRecordsTab = function(tab) {
       activeRecordsTab = tab;
       
       // 🌟 修正：統一提取 class 樣式，皆包含 border-b-2，利用顏色做區分消除跳動
-      const activeClass = 'text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#2979ff] border-b-2 border-[#2979ff] pb-1 transition-all whitespace-nowrap';
-      const inactiveClass = 'text-[10px] md:text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-1 transition-all whitespace-nowrap';
+      const activeClass = 'text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#2979ff] border-b-2 border-[#2979ff] pb-1 transition-all whitespace-nowrap flex items-center';
+      const inactiveClass = 'text-[10px] md:text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-1 transition-all whitespace-nowrap flex items-center';
       
       if(els.tabBtnCurrent) els.tabBtnCurrent.className = tab === 'current' ? activeClass : inactiveClass;
       if(els.tabBtnHistory) els.tabBtnHistory.className = tab === 'history' ? activeClass : inactiveClass;
